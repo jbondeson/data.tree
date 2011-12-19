@@ -3,7 +3,8 @@
   data.tree.bst
   (:refer-clojure :exclude [comparator comp])
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
-                         IPersistentCollection Counted)))
+                         IPersistentCollection Counted Sorted
+                         Reversible)))
 
 (defmacro with-comparator
   "Macro to automate the binding of a comparator result"
@@ -109,7 +110,7 @@
                     (if (nil? lnode)
                       (make-righty-node x r)
                       (make-full-node x lnode r)))
-       :else      (let [successor (loop [node (right r)]
+       :else      (let [successor (loop [node r]
                                     (let [smaller (left node)]
                                       (if (nil? smaller)
                                         node
@@ -119,7 +120,7 @@
                       (if (nil? (right r))
                         (make-lefty-node val l)
                         (make-full-node val l (right r)))
-                      (make-full-node val l (delete r val successor)))))))
+                      (make-full-node val l (delete r val comp)))))))
   (retrieve [this item comp]
     (with-comparator comp res item x
       (cond
@@ -143,20 +144,99 @@
 (defn- make-full-node [item left right]
   (FullNode. item left right))
 
+;;=======  Seq Implementation   =======;;
 
-;;=======  Tree Implementations =======;;
-
-(declare make-empty-bst make-bst)
-
-(defn- seq-equals [a b]
+(defn- seq-equals
+  "Determines whether two sequences expand equally"
+  [a b]
   (boolean
    (when (or (sequential? b) (instance? java.util.List b))
      (loop [a (seq a), b (seq b)]
        (when (= (nil? a) (nil? b))
-         (or
-          (nil? a)
-          (when (= (first a) (first b))
-            (recur (next a) (next b)))))))))
+         (or (nil? a)
+             (when (= (first a) (first b))
+               (recur (next a) (next b)))))))))
+
+(defn memoize-by-id
+  "Memoizes based upon a supplied object rather than the whole argument list"
+  [f]
+  (let [mem (atom {})]
+    (fn [id & args]
+      (if-let [e (find @mem id)]
+        (val e)
+        (let [ret (apply f args)]
+          (swap! mem assoc id ret)
+          ret)))))
+
+(def ^{:doc "Generates a hash code for a sequence based upon a unique-id."
+       :private true
+       :static true}
+  seq-hash
+  (memoize-by-id
+   (fn [coll]
+     (reduce (fn [h x] (unchecked-add-int
+                       (unchecked-multiply-int h 31)
+                       (hash x)))
+             1 coll))))
+
+(def ^{:doc "Generates a count for a sequence based upon a unique-id."
+       :private true
+       :static true}
+  seq-count
+  (memoize-by-id
+   (fn [coll]
+     (reduce (fn [x _] (inc x)) 0 coll))))
+
+(defn- ^:static push-stack
+  [^data.tree.bst.Node node ^clojure.lang.ISeq stack asc]
+  (let [f (if asc
+            (fn [x] (left x))
+            (fn [x] (right x)))]
+    (loop [t node
+           s stack]
+      (if (nil? t)
+        s
+        (recur (f t) (cons t s))))))
+
+(deftype Seq [^clojure.lang.IPersistentMap mdata ^clojure.lang.ISeq stack asc cnt id]
+  Object
+  (equals [this x] (seq-equals this x))
+  (hashCode [this] (seq-hash id this))
+  clojure.lang.IObj
+  (meta [_] mdata)
+  (withMeta [_ mdata] (Seq. mdata stack asc cnt id))
+  Sequential
+  Seqable
+  (seq [this] this)
+  ISeq
+  (first [_] (value (first stack)))
+  (more [this] (or (next this) (list)))
+  (next [_] (let [f (if asc
+                      (fn [x] (right x))
+                      (fn [x] (left x)))
+                  t (first stack)
+                  s (push-stack (f t) (next stack) asc)]
+              (when (not (nil? s))
+                (Seq. mdata s asc (dec cnt) (Object.)))))
+  IPersistentCollection
+  (count [this] (or cnt (seq-count id this)))
+  (empty [_] (list))
+  (equiv [this x] (.equals this x))
+  (cons [this item] (cons item this)))
+
+(defn- make-seq
+  ([tree asc]
+     (Seq. nil (push-stack tree nil asc) asc nil (Object.)))
+  ([tree asc cnt]
+     (Seq. nil (push-stack tree nil asc) asc cnt (Object.)))
+  ([mdata tree asc cnt]
+     (Seq. mdata (push-stack tree nil asc) asc cnt (Object.)))
+  ([mdata tree asc cnt id]
+     (Seq. mdata (push-stack tree nil asc) asc cnt id)))
+
+;;=======  Tree Implementations =======;;
+
+(declare make-empty-bst make-bst)
 
 (deftype EmptyBinarySearchTree [^clojure.lang.IPersistentMap mdata
                                 ^java.util.Comparator comparator]
@@ -203,11 +283,13 @@
   (withMeta [_ mdata] (BinarySearchTree. mdata comparator tree count))
   Sequential
   Seqable
-  (seq [_] nil)
+  (seq [_] (make-seq tree true count))
   ISeq
-  (first [_] nil)
+  (first [_] (value tree))
   (more [this] this)
   (next [_] nil)
+  Reversible
+  (rseq [_] (make-seq tree false count))
   IPersistentCollection
   (count [_] count)
   (empty [this] (EmptyBinarySearchTree. mdata comparator))
@@ -218,7 +300,22 @@
   (disjoin [this item]
     (BinarySearchTree. mdata comparator (remove tree item comparator) (inc count)))
   (contains [this x] (not (nil? (.get this x))))
-  (get [_ x] (retrieve tree x comparator)))
+  (get [_ x] (retrieve tree x comparator))
+  Sorted
+  (comparator [_] comparator)
+  (entryKey [this x] (when (contains? this) x))
+  (seqFrom [_ item asc]
+    (loop [node tree
+           stack nil]
+      (if (nil? node)
+        (when stack (make-seq stack asc))
+        (with-comparator comparator res item (value node)
+          (cond
+           (= res  0)           (make-seq (cons node stack) asc)
+           (and asc (= res -1)) (recur (left node) (cons node stack))
+           asc                  (recur (right node) stack)
+           (= res 1)            (recur (right node) (cons node stack))
+           :else                (recur (left node) stack)))))))
 
 
 (def ^:private def-comp
@@ -242,19 +339,20 @@
       (BinarySearchTree. mdata comparator tree count)))
 
 (defn- ^:static build-tree
+  "Returns a vector consisting of the tree and count of items"
   [^java.util.Comparator comparator vals]
   (when-let [coll (seq vals)]
     (let [[x & xs] coll
           root (make-leaf-node x)
-          ins (fn [[t c] v] [(insert t v comparator) (inc c)])
-          [tree count] (reduce ins [root 1] xs)]
-      (make-bst nil tree count))))
+          ins (fn [[t c] v] [(insert t v comparator) (inc c)])]
+      (reduce ins [root 1] xs))))
 
 (defn ^:static binary-search-tree
   ([]
      (make-empty-bst))
   ([& vals]
-     (build-tree def-comp vals)))
+     (let [[tree count] (build-tree def-comp vals)]
+       (make-bst nil tree count))))
 
 (defn ^:static binary-search-tree-by
   ([^java.util.Comparator comparator]
