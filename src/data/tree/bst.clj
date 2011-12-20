@@ -1,4 +1,4 @@
-0(ns ^{:doc "Persistent Binary Search Tree"
+(ns ^{:doc "Persistent Binary Search Tree"
       :author "Jeremy Bondeson"}
   data.tree.bst
   (:refer-clojure :exclude [comparator comp])
@@ -6,19 +6,21 @@
                          IPersistentCollection Counted Sorted
                          Reversible)))
 
+(set! *warn-on-reflection* true)
+
 (defmacro with-comparator
   "Macro to automate the binding of a comparator result"
   ([^java.util.Comparator comparator result x y & body]
-     `(let [~result (. ~comparator (compare ~x ~y))]
+     `(let [~result (int (.compare ~comparator ~x ~y))]
         ~@body)))
 
-(defprotocol Node
-  (insert [^data.tree.bst.Node node item ^java.util.Comparator comp])
-  (delete [^data.tree.bst.Node node item ^java.util.Comparator comp])
-  (retrieve [^data.tree.bst.Node node item ^java.util.Comparator comp])
-  (value [^data.tree.bst.Node node])
-  (left [^data.tree.bst.Node node])
-  (right [^data.tree.bst.Node node]))
+(definterface Node
+  (insert [item ^java.util.Comparator comp])
+  (delete [item ^java.util.Comparator comp])
+  (retrieve [item ^java.util.Comparator comp])
+  (value [])
+  (left [])
+  (right []))
 
 (declare make-leaf-node make-lefty-node make-righty-node make-full-node)
 
@@ -27,6 +29,7 @@
   (insert [this item comp]
     (let [leaf (make-leaf-node item)]
       (with-comparator comp res item x
+      ;(let [^Integer res (.compare comp item x)]
         (cond
          (= res 0)  this
          (= res -1) (make-lefty-node x leaf)
@@ -45,88 +48,88 @@
   (left [this] nil)
   (right [this] nil))
 
-(deftype LeftyNode [x ^data.tree.bst.Node l]
+(deftype LeftyNode [x ^Node l]
   Node
   (insert [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0)  this
-       (= res -1) (make-lefty-node x (insert l item comp))
+       (= res -1) (make-lefty-node x (.insert l item comp))
        :else      (make-full-node x l (make-leaf-node item)))))
   (delete [this item comp]
      (with-comparator comp res item x
       (cond
        (= res 0)  l
-       (= res -1) (make-lefty-node x (delete l item comp))
+       (= res -1) (make-lefty-node x (.delete l item comp))
        :else      this)))
   (retrieve [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0)  x
-       (= res -1) (retrieve l item comp))))
+       (= res -1) (.retrieve l item comp))))
   (value [_] x)
   (left [_] l)
   (right [_] nil))
 
-(deftype RightyNode [x ^data.tree.bst.Node r]
-  Node
-  (insert [this item  comp]
-    (with-comparator comp res item x
-      (cond
-       (= res 0) this
-       (= res 1) (make-righty-node x (insert r item comp))
-       :else     (make-full-node x (make-leaf-node item) r))))
-  (delete [this item comp]
-    (with-comparator comp res item x
-      (cond
-       (= res 0) r
-       (= res 1) (make-righty-node x (delete r item comp))
-       :else      this)))
-  (retrieve [this item comp]
-    (with-comparator comp res item x
-      (cond
-       (= res 0)  x
-       (= res 1) (retrieve r item comp))))
-  (value [_] x)
-  (left [_] nil)
-  (right [_] r))
-
-(deftype FullNode [x ^data.tree.bst.Node l ^data.tree.bst.Node r]
+(deftype RightyNode [x ^Node r]
   Node
   (insert [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0) this
-       (= res 1) (make-full-node x l (insert r item comp))
-       :else     (make-full-node x (insert l item comp) r))))
+       (= res 1) (make-righty-node x (.insert r item comp))
+       :else     (make-full-node x (make-leaf-node item) r))))
   (delete [this item comp]
     (with-comparator comp res item x
       (cond
-       (= res  1) (let [rnode (delete r item comp)]
-                    (if (nil? rnode)
-                      (make-lefty-node x l)
-                      (make-full-node x l rnode)))
-       (= res -1) (let [lnode (delete l item comp)]
-                    (if (nil? lnode)
-                      (make-righty-node x r)
-                      (make-full-node x lnode r)))
-       :else      (let [successor (loop [node r]
-                                    (let [smaller (left node)]
-                                      (if (nil? smaller)
-                                        node
-                                        (recur smaller))))
-                        val (value successor)]
-                    (if (identical? r successor)
-                      (if (nil? (right r))
-                        (make-lefty-node val l)
-                        (make-full-node val l (right r)))
-                      (make-full-node val l (delete r val comp)))))))
+       (= res 0) r
+       (= res 1) (make-righty-node x (.delete r item comp))
+       :else      this)))
   (retrieve [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0)  x
-       (= res 1) (retrieve r item comp)
-       :else     (retrieve l item comp))))
+       (= res 1) (.retrieve r item comp))))
+  (value [_] x)
+  (left [_] nil)
+  (right [_] r))
+
+(deftype FullNode [x ^Node l ^Node r]
+  Node
+  (insert [this item comp]
+    (with-comparator comp res item x
+      (cond
+       (= res 0) this
+       (= res 1) (make-full-node x l (.insert r item comp))
+       :else     (make-full-node x (.insert l item comp) r))))
+  (delete [this item comp]
+    (with-comparator comp res item x
+      (cond
+       (= res  1) (let [rnode (.delete r item comp)]
+                    (if (nil? rnode)
+                      (make-lefty-node x l)
+                      (make-full-node x l rnode)))
+       (= res -1) (let [lnode (.delete l item comp)]
+                    (if (nil? lnode)
+                      (make-righty-node x r)
+                      (make-full-node x lnode r)))
+       :else      (let [^Node successor (loop [^Node node r]
+                                           (let [smaller (.left node)]
+                                             (if (nil? smaller)
+                                               node
+                                               (recur smaller))))
+                        val (.value successor)]
+                    (if (identical? r successor)
+                      (if (nil? (.right r))
+                        (make-lefty-node val l)
+                        (make-full-node val l (.right r)))
+                      (make-full-node val l (.delete r val comp)))))))
+  (retrieve [this item comp]
+    (with-comparator comp res item x
+      (cond
+       (= res 0)  x
+       (= res 1) (.retrieve r item comp)
+       :else     (.retrieve l item comp))))
   (value [_] x)
   (left [_] l)
   (right [_] r))
@@ -134,14 +137,15 @@
 (defn- make-leaf-node [item]
   (LeafNode. item))
 
-(defn- make-lefty-node [item left]
+(defn- make-lefty-node [item ^Node left]
   (LeftyNode. item left))
 
-(defn- make-righty-node [item right]
+(defn- make-righty-node [item ^Node right]
   (RightyNode. item right))
 
-(defn- make-full-node [item left right]
+(defn- make-full-node [item ^Node left ^Node right]
   (FullNode. item left right))
+
 
 ;;=======  Seq Implementation   =======;;
 
@@ -188,12 +192,12 @@
      (reduce (fn [x _] (inc x)) 0 coll))))
 
 (defn- ^:static push-stack
-  [^data.tree.bst.Node node ^clojure.lang.ISeq stack asc]
+  [^Node node ^clojure.lang.ISeq stack asc]
   (let [f (if asc
-            (fn [x] (left x))
-            (fn [x] (right x)))]
-    (loop [t node
-           s stack]
+            (fn [^Node x] (.left x))
+            (fn [^Node x] (.right x)))]
+    (loop [^Node t node
+           ^clojure.lang.ISeq s stack]
       (if (nil? t)
         s
         (recur (f t) (cons t s))))))
@@ -209,11 +213,12 @@
   Seqable
   (seq [this] this)
   ISeq
-  (first [_] (value (first stack)))
+  (first [_] (let [^Node node (first stack)]
+               (.value node)))
   (more [this] (or (next this) (list)))
   (next [_] (let [f (if asc
-                      (fn [x] (right x))
-                      (fn [x] (left x)))
+                      (fn [^Node x] (.right x))
+                      (fn [^Node x] (.left x)))
                   t (first stack)
                   s (push-stack (f t) (next stack) asc)]
               (when (not (nil? s))
@@ -225,23 +230,26 @@
   (cons [this item] (cons item this)))
 
 (defn- make-seq
-  ([tree asc]
+  ([^Node tree asc]
      (Seq. nil (push-stack tree nil asc) asc nil (Object.)))
-  ([tree asc cnt]
+  ([^Node tree asc cnt]
      (Seq. nil (push-stack tree nil asc) asc cnt (Object.)))
-  ([mdata tree asc cnt]
+  ([mdata ^Node tree asc cnt]
      (Seq. mdata (push-stack tree nil asc) asc cnt (Object.)))
-  ([mdata tree asc cnt id]
+  ([mdata ^Node tree asc cnt id]
      (Seq. mdata (push-stack tree nil asc) asc cnt id)))
 
 ;;=======  Tree Implementations =======;;
+
+(declare make-bst)
 
 (deftype EmptyBinarySearchTree [^clojure.lang.IPersistentMap mdata
                                 ^java.util.Comparator comparator]
   Object
   (equals [_ x]
     (if (isa? (type x) EmptyBinarySearchTree)
-      (= comparator (.comparator x))
+      (let [^EmptyBinarySearchTree x x]
+        (= comparator (.comparator x)))
       false))
   (hashCode [this] (hash (map identity this)))
   clojure.lang.IObj
@@ -254,7 +262,7 @@
   (count [_] 0)
   (empty [this] this)
   (equiv [this x] (.equals this x))
-  (cons [_ item] (BinarySearchTree. mdata comparator (make-leaf-node item) 1))
+  (cons [_ item] (make-bst mdata comparator (make-leaf-node item) 1))
   IPersistentSet
   (disjoin [this _] this)
   (contains [this _] false)
@@ -262,14 +270,15 @@
 
 (deftype BinarySearchTree [^clojure.lang.IPersistentMap mdata
                            ^java.util.Comparator comparator
-                           ^data.tree.bst.Node tree
+                           ^Node tree
                            ^java.lang.Long count]
   Object
   (equals [_ x]
     (if (isa? (type x) BinarySearchTree)
-      (and
-       (= comparator (.comparator x))
-       (= tree (.tree x)))
+      (let [^BinarySearchTree x x]
+        (and
+         (= comparator (.comparator x))
+         (= tree (.tree x))))
       false))
   (hashCode [this] (hash (map identity this)))
   clojure.lang.IObj
@@ -285,28 +294,31 @@
   (empty [this] (EmptyBinarySearchTree. mdata comparator))
   (equiv [this x] (.equals this x))
   (cons [_ item]
-    (BinarySearchTree. mdata comparator (insert tree item comparator) (inc count)))
+    (BinarySearchTree. mdata comparator (.insert tree item comparator) (inc count)))
   IPersistentSet
   (disjoin [this item]
-    (BinarySearchTree. mdata comparator (remove tree item comparator) (inc count)))
+    (BinarySearchTree. mdata comparator (.delete tree item comparator) (inc count)))
   (contains [this x] (not (nil? (.get this x))))
-  (get [_ x] (retrieve tree x comparator))
+  (get [_ x] (.retrieve tree x comparator))
   Sorted
   (comparator [_] comparator)
   (entryKey [this x] (when (contains? this) x))
   (seqFrom [_ item asc]
-    (loop [node tree
+    (loop [^Node node tree
            stack nil]
       (if (nil? node)
         (when stack (make-seq stack asc))
-        (with-comparator comparator res item (value node)
+        (with-comparator comparator res item (.value node)
           (cond
            (= res  0)           (make-seq (cons node stack) asc)
-           (and asc (= res -1)) (recur (left node) (cons node stack))
-           asc                  (recur (right node) stack)
-           (= res 1)            (recur (right node) (cons node stack))
-           :else                (recur (left node) stack)))))))
+           (and asc (= res -1)) (recur (.left node) (cons node stack))
+           asc                  (recur (.right node) stack)
+           (= res 1)            (recur (.right node) (cons node stack))
+           :else                (recur (.left node) stack)))))))
 
+
+(defn- make-bst [mdata comparator tree count]
+  (BinarySearchTree. mdata comparator tree count))
 
 (def ^:private def-comp
   clojure.lang.RT/DEFAULT_COMPARATOR)
@@ -317,7 +329,7 @@
   (when-let [coll (seq vals)]
     (let [[x & xs] coll
           root (make-leaf-node x)
-          ins (fn [[t c] v] [(insert t v comparator) (inc c)])]
+          ins (fn [[^Node t c] v] [(.insert t v comparator) (inc c)])]
       (reduce ins [root 1] xs))))
 
 (defn ^:static binary-search-tree
@@ -335,7 +347,6 @@
   ([^java.util.Comparator comparator & keys]
      (let [[tree count] (build-tree def-comp keys)]
        (BinarySearchTree. nil comparator tree count))))
-     
 
 ;;-- Pretty Printing
 (defprotocol PrintableTree
@@ -352,9 +363,9 @@
 (extend-protocol PrintableTree
   EmptyBinarySearchTree  (print-tree [x] (p "BST : 0 empty"))
   BinarySearchTree       (print-tree [x] (p "BST :" (.count x) (.tree x)))
-  LeafNode               (print-tree [x] (p "LeafNode" (value x)))
-  LeftyNode              (print-tree [x] (p "LeftyNode" (value x) (left x)))
-  RightyNode             (print-tree [x] (p "RightyNode" (value x) (right x)))
-  FullNode               (print-tree [x] (p "FullNode" (value x) (left x) (right x)))
+  LeafNode               (print-tree [x] (p "LeafNode" (.value x)))
+  LeftyNode              (print-tree [x] (p "LeftyNode" (.value x) (.left x)))
+  RightyNode             (print-tree [x] (p "RightyNode" (.value x) (.right x)))
+  FullNode               (print-tree [x] (p "FullNode" (.value x) (.left x) (.right x)))
   Object                 (print-tree [x] (pr x))
   nil                    (print-tree [x] (print "nil")))
