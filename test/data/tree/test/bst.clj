@@ -3,7 +3,7 @@
   (:use [clojure.test])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
                           LeafNode LeftyNode RightyNode FullNode
-                          Node
+                          INode
                           )))
 
 (def ^:private c
@@ -121,11 +121,11 @@
 ;;==== Helper Functions ====
 
 ;; Alias node functions to take the default comparator
-(defn ins-def [^Node tree item] (.insert tree item c))
-(defn del-def [^Node tree item] (.delete tree item c))
-(defn ret-def [^Node tree item] (.retrieve tree item c))
+(defn ins-def [^INode tree item] (.insert tree item c))
+(defn del-def [^INode tree item] (.delete tree item c))
+(defn ret-def [^INode tree item] (.retrieve tree item c))
 
-(defn flatten-tree [^Node tree]
+(defn flatten-tree [^INode tree]
   (loop [res '[]
          node tree
          queue '()]
@@ -136,7 +136,7 @@
                   (.left node)
                   (cons (.right node) queue)))))
 
-(defn tree-structure [^Node tree]
+(defn tree-structure [^INode tree]
   (when tree
     (let [l (.left tree)
           r (.right tree)
@@ -145,8 +145,8 @@
         v
         (list v (tree-structure l) (tree-structure r))))))
 
-(defn identical-traversal? [^Node tree coll]
+(defn identical-traversal? [^INode tree coll]
   (= (flatten-tree tree) coll))
 
-(defn identical-structure? [^Node tree structure]
+(defn identical-structure? [^INode tree structure]
   (= (tree-structure tree) structure))
