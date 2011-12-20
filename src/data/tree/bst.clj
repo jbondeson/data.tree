@@ -131,7 +131,6 @@
   (left [_] l)
   (right [_] r))
 
-
 (defn- make-leaf-node [item]
   (LeafNode. item))
 
@@ -157,7 +156,8 @@
              (when (= (first a) (first b))
                (recur (next a) (next b)))))))))
 
-(defn memoize-by-id
+(defn ^{:private true :static true}
+  memoize-by-id
   "Memoizes based upon a supplied object rather than the whole argument list"
   [f]
   (let [mem (atom {})]
@@ -321,17 +321,19 @@
       (reduce ins [root 1] xs))))
 
 (defn ^:static binary-search-tree
+  "Returns a new binary search tree with supplied keys."
   ([]
      (EmptyBinarySearchTree. nil def-comp))
-  ([& vals]
-     (let [[tree count] (build-tree def-comp vals)]
+  ([& keys]
+     (let [[tree count] (build-tree def-comp keys)]
        (BinarySearchTree. nil def-comp tree count))))
 
 (defn ^:static binary-search-tree-by
+  "Returns a new binary search tree with supplied keys, using the supplied comparator."
   ([^java.util.Comparator comparator]
      (EmptyBinarySearchTree. nil comparator))
-  ([^java.util.Comparator comparator & vals]
-     (let [[tree count] (build-tree def-comp vals)]
+  ([^java.util.Comparator comparator & keys]
+     (let [[tree count] (build-tree def-comp keys)]
        (BinarySearchTree. nil comparator tree count))))
      
 
