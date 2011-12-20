@@ -236,8 +236,6 @@
 
 ;;=======  Tree Implementations =======;;
 
-(declare make-empty-bst make-bst)
-
 (deftype EmptyBinarySearchTree [^clojure.lang.IPersistentMap mdata
                                 ^java.util.Comparator comparator]
   Object
@@ -252,15 +250,11 @@
   Sequential
   Seqable
   (seq [_] nil)
-  ISeq
-  (first [_] nil)
-  (more [this] this)
-  (next [_] nil)
   IPersistentCollection
   (count [_] 0)
   (empty [this] this)
   (equiv [this x] (.equals this x))
-  (cons [_ item] (make-bst mdata comparator (make-leaf-node item) 1))
+  (cons [_ item] (BinarySearchTree. mdata comparator (make-leaf-node item) 1))
   IPersistentSet
   (disjoin [this _] this)
   (contains [this _] false)
@@ -284,10 +278,6 @@
   Sequential
   Seqable
   (seq [_] (make-seq tree true count))
-  ISeq
-  (first [_] (value tree))
-  (more [this] this)
-  (next [_] nil)
   Reversible
   (rseq [_] (make-seq tree false count))
   IPersistentCollection
@@ -321,23 +311,6 @@
 (def ^:private def-comp
   clojure.lang.RT/DEFAULT_COMPARATOR)
 
-(defn- ^:static make-empty-bst
-  ([]
-     (EmptyBinarySearchTree. nil def-comp))
-  ([^java.util.Comparator comparator]
-     (EmptyBinarySearchTree. nil comparator)))
-
-(defn- ^:static make-bst
-  ([^clojure.lang.IPersistentMap mdata
-    ^data.tree.bst.Node tree
-    ^java.lang.Long count]
-     (BinarySearchTree. mdata def-comp tree count))
-  ([^clojure.lang.IPersistentMap mdata
-    ^java.util.Comparator comparator
-    ^data.tree.bst.Node tree
-    ^java.lang.Long count]
-      (BinarySearchTree. mdata comparator tree count)))
-
 (defn- ^:static build-tree
   "Returns a vector consisting of the tree and count of items"
   [^java.util.Comparator comparator vals]
@@ -349,16 +322,18 @@
 
 (defn ^:static binary-search-tree
   ([]
-     (make-empty-bst))
+     (EmptyBinarySearchTree. nil def-comp))
   ([& vals]
      (let [[tree count] (build-tree def-comp vals)]
-       (make-bst nil tree count))))
+       (BinarySearchTree. nil def-comp tree count))))
 
 (defn ^:static binary-search-tree-by
   ([^java.util.Comparator comparator]
-     (make-empty-bst comparator))
+     (EmptyBinarySearchTree. nil comparator))
   ([^java.util.Comparator comparator & vals]
-     (build-tree comparator vals)))
+     (let [[tree count] (build-tree def-comp vals)]
+       (BinarySearchTree. nil comparator tree count))))
+     
 
 ;;-- Pretty Printing
 (defprotocol PrintableTree
