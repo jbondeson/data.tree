@@ -1,6 +1,7 @@
 (ns data.tree.test.bst
   (:use [data.tree.bst])
   (:use [clojure.test])
+  (:require [data.tree.quickref :as qref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
                           LeafNode LeftyNode RightyNode FullNode
                           TransNode
@@ -22,7 +23,7 @@
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
-          root (TransNode. x (ref nil :max-history 0) (ref nil :max-history 0))
+          root (TransNode. x (qref/ref INode nil) (qref/ref INode nil))
           ins (fn [[^INode t cnt] v] [(.doInsert t v c) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))

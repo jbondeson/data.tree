@@ -214,11 +214,11 @@
   (left [_] l)
   (right [_] r))
 
-(deftype TransNode [x ^clojure.lang.IRef l ^clojure.lang.IRef r]
+(deftype TransNode [x l r]
   INode
   (insert [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
+    (let [^INode lnode (qref/deref l)
+          ^INode rnode (qref/deref r)]
       (with-comparator comp res item x
         (cond
          (= res 0) this
@@ -234,8 +234,8 @@
                     :else             (make-lefty-node x (make-lefty-node item)))))))
 
   (delete [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
+    (let [^INode lnode (qref/deref l)
+          ^INode rnode (qref/deref r)]
       (with-comparator comp res item x
         (cond
          (= res -1) (if lnode
@@ -270,32 +270,32 @@
 
   (doInsert [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
+      (let [^INode rnode (qref/deref r)
+            ^INode lnode (qref/deref l)]
         (cond
          (= res 0) this
          (= res 1) (do
                      (if rnode
-                       (ref-set r (.doInsert rnode item comp))
-                       (ref-set r (make-trans-node item)))
+                       (qref/set! r (.doInsert rnode item comp))
+                       (qref/set! r (make-trans-node item)))
                      this)
          :else     (do
                      (if lnode
-                       (ref-set l (.doInsert lnode item comp))
-                       (ref-set l (make-trans-node item)))
+                       (qref/set! l  (.doInsert lnode item comp))
+                       (qref/set! l (make-trans-node item)))
                      this)))))
   (doDelete [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
+      (let [^INode rnode (qref/deref r)
+            ^INode lnode (qref/deref l)]
         (cond
          (= res  1) (do
                       (when rnode
-                        (ref-set r (.doDelete rnode item comp)))
+                        (qref/set! r (.doDelete rnode item comp)))
                       this)
          (= res -1) (do
                       (when lnode
-                        (ref-set l (.doDelete lnode item comp)))
+                        (qref/set! l (.doDelete lnode item comp)))
                       this)
          :else      (if (and lnode rnode)
                       (let [^INode successor (loop [^INode node rnode]
@@ -310,16 +310,16 @@
                       (or lnode rnode))))))
   
   (retrieve [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
+    (let [^INode lnode (qref/deref l)
+          ^INode rnode (qref/deref r)]
       (with-comparator comp res item x
         (cond
          (= res 0)  x
          (and (= res -1) lnode) (.retrieve lnode item comp)
          (and (= res  1) rnode) (.retrieve rnode item comp)))))
   (value [_] x)
-  (left [_] @l)
-  (right [_] @r))
+  (left [_] (qref/deref l))
+  (right [_] (qref/deref r)))
 
 (defn- make-leaf-node [item]
   (LeafNode. item))
@@ -335,9 +335,9 @@
 
 (defn- make-trans-node
   ([item]
-     (TransNode. item (ref nil) (ref nil)))
+     (TransNode. item (qref/ref INode nil) (qref/ref INode nil)))
   ([item ^INode left ^INode right]
-     (TransNode. item (ref left) (ref right))))
+     (TransNode. item (qref/ref INode left) (qref/ref INode right))))
 
 
 ;;=======  Seq Implementation   =======;;
