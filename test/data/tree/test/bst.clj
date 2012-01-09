@@ -1,9 +1,11 @@
 (ns data.tree.test.bst
   (:use [data.tree.bst])
   (:use [clojure.test])
+  (:require [data.tree.quickref :as qref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
                           LeafNode LeftyNode RightyNode FullNode
-                          INode
+                          TransNode
+                          INode 
                           )))
 
 (def ^:private c
@@ -16,6 +18,17 @@
 (defn build-def
   [& args]
   (build c args))
+
+(defn build-trans-def
+  [& args]
+  (when-let [coll (seq args)]
+    (let [[x & xs] coll
+          eleft (into-array INode [nil])
+          eright (into-array INode [nil])
+          root (TransNode. x eleft eright)
+          ins (fn [[^INode t cnt] v] [(.doInsert t v c) (inc cnt)])]
+      (dosync
+       (reduce ins [root 1] xs)))))
 
 (def test-trees
   {:leaf        '(50)
@@ -39,7 +52,11 @@
 (def bsts
   (mmap (partial apply binary-search-tree) test-trees))
 
-(declare identical-structure? ins-def del-def ret-def)
+(def transients
+  (mmap (fn [v] (first (apply build-trans-def v))) test-trees))
+
+(declare identical-structure? ins-def del-def ret-def
+         doins-def dodel-def)
 
 ;; Empty Tests
 (deftest one-empty-bst
@@ -124,6 +141,8 @@
 (defn ins-def [^INode tree item] (.insert tree item c))
 (defn del-def [^INode tree item] (.delete tree item c))
 (defn ret-def [^INode tree item] (.retrieve tree item c))
+(defn doins-def [^INode tree item] (.doInsert tree item c))
+(defn dodel-def [^INode tree item] (.doDelete tree item c))
 
 (defn flatten-tree [^INode tree]
   (loop [res '[]
@@ -150,3 +169,31 @@
 
 (defn identical-structure? [^INode tree structure]
   (= (tree-structure tree) structure))
+
+(defn- make-queue
+  [& args]
+  (reduce conj clojure.lang.PersistentQueue/EMPTY args))
+
+(defn- sane-round
+  ([n]
+     (int (.setScale (bigdec n) 0 java.math.RoundingMode/HALF_EVEN))))
+
+(defn balanced-seq
+  [count]
+  (loop [coll '[]
+         queue (make-queue [0 (dec count)])]
+    (if (empty? queue)
+      coll
+      (let [head (peek queue)
+            nqueue (pop queue) 
+            [lo hi] head
+            val (+ lo (sane-round (/ (- hi lo) 2)))
+            ncoll (conj coll val)
+            vlo [lo (dec val)]
+            vhi [(inc val) hi]]        
+        (cond
+         (and (not= lo val) (not= val hi)) (recur ncoll (conj nqueue vlo vhi))
+         (not= lo val)                     (recur ncoll (conj nqueue vlo))
+         (not= val hi)                     (recur ncoll (conj nqueue vhi))
+         :else                             (recur ncoll nqueue))))))
+
