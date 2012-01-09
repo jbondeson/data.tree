@@ -4,7 +4,7 @@
   (:refer-clojure :exclude [comparator comp])
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
-                         Reversible)))
+                         Reversible IEditableCollection)))
 
 (set! *warn-on-reflection* true)
 
@@ -16,7 +16,9 @@
 
 (definterface INode
   (^data.tree.bst.INode insert [item ^java.util.Comparator comp])
+  (^data.tree.bst.INode insert [edit item ^java.util.Comparator comp])
   (^data.tree.bst.INode delete [item ^java.util.Comparator comp])
+  (^data.tree.bst.INode delete [edit item ^java.util.Comparator comp])
   (retrieve [item ^java.util.Comparator comp])
   (value [])
   (left [])
@@ -264,8 +266,10 @@
   (cons [_ item] (make-bst mdata comparator (make-leaf-node item) 1))
   IPersistentSet
   (disjoin [this _] this)
-  (contains [this _] false)
-  (get [this _] nil))
+  (contains [_ __] false)
+  (get [_ __] nil)
+  IEditableCollection
+  (asTransient [this] nil))
 
 (deftype BinarySearchTree [^clojure.lang.IPersistentMap mdata
                            ^java.util.Comparator comparator
@@ -313,7 +317,9 @@
            (and asc (= res -1)) (recur (.left node) (cons node stack))
            asc                  (recur (.right node) stack)
            (= res 1)            (recur (.right node) (cons node stack))
-           :else                (recur (.left node) stack)))))))
+           :else                (recur (.left node) stack))))))
+  IEditableCollection
+  (asTransient [this] nil))
 
 
 (defn- make-bst [mdata comparator tree count]
