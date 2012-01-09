@@ -4,5 +4,6 @@
                  [slingshot "0.10.0"]
                  [org.clojure/core.match "0.2.0-alpha8"]]
   :dev-dependencies [[radagast "1.1.1"]]
+  :java-source-path "jvm"
   :jvm-opts ["-agentlib:jdwp=transport=dt_socket,server=y,suspend=n"]
   ) 
