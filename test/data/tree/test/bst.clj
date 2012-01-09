@@ -23,7 +23,9 @@
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
-          root (TransNode. x (qref/ref INode nil) (qref/ref INode nil))
+          eleft (into-array INode [nil])
+          eright (into-array INode [nil])
+          root (TransNode. x eleft eright)
           ins (fn [[^INode t cnt] v] [(.doInsert t v c) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
@@ -194,3 +196,4 @@
          (not= lo val)                     (recur ncoll (conj nqueue vlo))
          (not= val hi)                     (recur ncoll (conj nqueue vhi))
          :else                             (recur ncoll nqueue))))))
+

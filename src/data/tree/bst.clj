@@ -214,11 +214,27 @@
   (left [_] l)
   (right [_] r))
 
+;;(qref/def-create inode-ref INode)
+;;(qref/def-deref inode-deref INode)
+;;(qref/def-set inode-set! INode)
+
+(defn- inode-ref ^"[Ldata.tree.bst.INode;" 
+  [^INode value]
+  (into-array INode [value]))
+
+(defn- inode-deref ^INode
+  [^"[Ldata.tree.bst.INode;" ref]
+  (aget ^"[Ldata.tree.bst.INode;" ref (int 0)))
+
+(defn- inode-set!
+  [^"[Ldata.tree.bst.INode;" ref ^INode value]
+  (aset ^"[Ldata.tree.bst.INode;" ref (int 0) value))
+
 (deftype TransNode [x l r]
   INode
   (insert [this item comp]
-    (let [^INode lnode (qref/deref l)
-          ^INode rnode (qref/deref r)]
+    (let [^INode lnode (inode-deref l)
+          ^INode rnode (inode-deref r)]
       (with-comparator comp res item x
         (cond
          (= res 0) this
@@ -234,8 +250,8 @@
                     :else             (make-lefty-node x (make-lefty-node item)))))))
 
   (delete [this item comp]
-    (let [^INode lnode (qref/deref l)
-          ^INode rnode (qref/deref r)]
+    (let [^INode lnode (inode-deref l)
+          ^INode rnode (inode-deref r)]
       (with-comparator comp res item x
         (cond
          (= res -1) (if lnode
@@ -270,32 +286,32 @@
 
   (doInsert [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode (qref/deref r)
-            ^INode lnode (qref/deref l)]
+      (let [^INode rnode (inode-deref r)
+            ^INode lnode (inode-deref l)]
         (cond
          (= res 0) this
          (= res 1) (do
                      (if rnode
-                       (qref/set! r (.doInsert rnode item comp))
-                       (qref/set! r (make-trans-node item)))
+                       (inode-set! r (.doInsert rnode item comp))
+                       (inode-set! r (make-trans-node item)))
                      this)
          :else     (do
                      (if lnode
-                       (qref/set! l  (.doInsert lnode item comp))
-                       (qref/set! l (make-trans-node item)))
+                       (inode-set! l  (.doInsert lnode item comp))
+                       (inode-set! l (make-trans-node item)))
                      this)))))
   (doDelete [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode (qref/deref r)
-            ^INode lnode (qref/deref l)]
+      (let [^INode rnode (inode-deref r)
+            ^INode lnode (inode-deref l)]
         (cond
          (= res  1) (do
                       (when rnode
-                        (qref/set! r (.doDelete rnode item comp)))
+                        (inode-set! r (.doDelete rnode item comp)))
                       this)
          (= res -1) (do
                       (when lnode
-                        (qref/set! l (.doDelete lnode item comp)))
+                        (inode-set! l (.doDelete lnode item comp)))
                       this)
          :else      (if (and lnode rnode)
                       (let [^INode successor (loop [^INode node rnode]
@@ -310,16 +326,16 @@
                       (or lnode rnode))))))
   
   (retrieve [this item comp]
-    (let [^INode lnode (qref/deref l)
-          ^INode rnode (qref/deref r)]
+    (let [^INode lnode (inode-deref l)
+          ^INode rnode (inode-deref r)]
       (with-comparator comp res item x
         (cond
          (= res 0)  x
          (and (= res -1) lnode) (.retrieve lnode item comp)
          (and (= res  1) rnode) (.retrieve rnode item comp)))))
   (value [_] x)
-  (left [_] (qref/deref l))
-  (right [_] (qref/deref r)))
+  (left [_] (inode-deref l))
+  (right [_] (inode-deref r)))
 
 (defn- make-leaf-node [item]
   (LeafNode. item))
@@ -335,9 +351,9 @@
 
 (defn- make-trans-node
   ([item]
-     (TransNode. item (qref/ref INode nil) (qref/ref INode nil)))
+     (TransNode. item (inode-ref nil) (inode-ref nil)))
   ([item ^INode left ^INode right]
-     (TransNode. item (qref/ref INode left) (qref/ref INode right))))
+     (TransNode. item (inode-ref left) (inode-ref right))))
 
 
 ;;=======  Seq Implementation   =======;;
