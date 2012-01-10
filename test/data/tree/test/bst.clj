@@ -53,8 +53,12 @@
 (def bsts
   (mmap (partial apply binary-search-tree) test-trees))
 
-(def transients
+(defn make-transients
+  []
   (mmap (fn [v] (first (apply build-trans-def v))) test-trees))
+
+(def transients
+  (make-transients))
 
 (declare identical-structure? ins-def del-def ret-def
          doins-def dodel-def)
@@ -138,11 +142,11 @@
           :l-full    79  nil
           :l-full    19  nil)))
 
-;;(node-insertion-tests transient-doinsert doins-def transients)
+(node-insertion-tests transient-doinsert doins-def (make-transients))
 (node-insertion-tests transient-insert   ins-def   transients)
 (node-insertion-tests persistent-insert  ins-def   trees)
 
-;;(node-deletion-tests transient-doinsert dodel-def transients)
+(node-deletion-tests transient-dodelete dodel-def (make-transients))
 (node-deletion-tests transient-delete   del-def   transients)
 (node-deletion-tests persistent-delete  del-def   trees)
 
