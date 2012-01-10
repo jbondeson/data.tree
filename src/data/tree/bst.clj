@@ -20,6 +20,8 @@
   (^data.tree.bst.INode delete [item ^java.util.Comparator comp])
   (^data.tree.bst.INode doInsert [item ^java.util.Comparator comp])
   (^data.tree.bst.INode doDelete [item ^java.util.Comparator comp])
+  (^data.tree.bst.INode doInsertCopy [item ^java.util.Comparator comp])
+  (^data.tree.bst.INode doDeleteCopy [item ^java.util.Comparator comp])
   (retrieve [item ^java.util.Comparator comp])
   (value [])
   (left [])
@@ -42,14 +44,16 @@
       (if (= res 0)
         nil
         this)))
-  (doInsert [this item comp]
+  (doInsert [this item comp] (.doInsertCopy this item comp))
+  (doDelete [this item comp] (.doDeleteCopy this item comp))
+  (doInsertCopy [this item comp]
     (let [leaf (make-trans-node item)]
       (with-comparator comp res item x
         (cond
          (= res 0)  leaf
          (= res -1) (make-trans-node x leaf nil)
          :else      (make-trans-node x nil leaf)))))
-  (doDelete [this item comp]
+  (doDeleteCopy [this item comp]
     (with-comparator comp res item x
       (if (= res 0)
         nil
@@ -80,17 +84,19 @@
                       (make-lefty-node x node)
                       (make-leaf-node x)))
        :else      this)))
-  (doInsert [this item comp]
+  (doInsert [this item comp] (.doInsertCopy this item comp))
+  (doDelete [this item comp] (.doDeleteCopy this item comp))
+  (doInsertCopy [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0)  this
-       (= res -1) (make-trans-node x (.doInsert l item comp) nil)
+       (= res -1) (make-trans-node x (.doInsertCopy l item comp) nil)
        :else      (make-trans-node x l (make-trans-node item)))))
-  (doDelete [this item comp]
+  (doDeleteCopy [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0)  l
-       (= res -1) (let [node (.doDelete l item comp)]
+       (= res -1) (let [node (.doDeleteCopy l item comp)]
                     (if node
                       (make-trans-node x node nil)
                       (make-trans-node x)))
@@ -121,17 +127,19 @@
                      (make-righty-node x node)
                      (make-leaf-node x)))
        :else      this)))
-  (doInsert [this item comp]
+  (doInsert [this item comp] (.doInsertCopy this item comp))
+  (doDelete [this item comp] (.doDeleteCopy this item comp))
+  (doInsertCopy [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0) this
-       (= res 1) (make-trans-node x nil (.doInsert r item comp))
+       (= res 1) (make-trans-node x nil (.doInsertCopy r item comp))
        :else     (make-trans-node x (make-trans-node item) r))))
-  (doDelete [this item comp]
+  (doDeleteCopy [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0) r
-       (= res 1) (let [node (.doDelete r item comp)]
+       (= res 1) (let [node (.doDeleteCopy r item comp)]
                    (if node
                      (make-trans-node x nil node)
                      (make-trans-node x)))
@@ -176,20 +184,22 @@
                         (make-lefty-node val l)
                         (make-full-node val l (.right r)))
                       (make-full-node val l (.delete r val comp)))))))
-  (doInsert [this item comp]
+  (doInsert [this item comp] (.doInsertCopy this item comp))
+  (doDelete [this item comp] (.doDeleteCopy this item comp))
+  (doInsertCopy [this item comp]
     (with-comparator comp res item x
       (cond
        (= res 0) this
-       (= res 1) (make-trans-node x l (.doInsert r item comp))
-       :else     (make-trans-node x (.doInsert l item comp) r))))
-  (doDelete [this item comp]
+       (= res 1) (make-trans-node x l (.doInsertCopy r item comp))
+       :else     (make-trans-node x (.doInsertCopy l item comp) r))))
+  (doDeleteCopy [this item comp]
     (with-comparator comp res item x
       (cond
-       (= res  1) (let [rnode (.doDelete r item comp)]
+       (= res  1) (let [rnode (.doDeleteCopy r item comp)]
                     (if rnode
                       (make-trans-node x l rnode)
                       (make-trans-node x l nil)))
-       (= res -1) (let [lnode (.doDelete l item comp)]
+       (= res -1) (let [lnode (.doDeleteCopy l item comp)]
                     (if lnode
                       (make-trans-node x lnode r)
                       (make-trans-node x nil r)))
@@ -203,7 +213,7 @@
                       (if (nil? (.right r))
                         (make-trans-node val l nil)
                         (make-trans-node val l (.right r)))
-                      (make-trans-node val l (.doDelete r val comp)))))))
+                      (make-trans-node val l (.doDeleteCopy r val comp)))))))
   (retrieve [this item comp]
     (with-comparator comp res item x
       (cond
@@ -267,7 +277,6 @@
                             (make-lefty-node val lnode))
                           (make-full-node val lnode (.delete rnode val comp))))
                       (or lnode rnode))))))
-
   (doInsert [this item comp]
     (with-comparator comp res item x
       (let [^INode rnode @r
@@ -307,6 +316,44 @@
                         (if (identical? rnode successor)
                           (make-trans-node val lnode (.right rnode))
                           (make-trans-node val lnode (.doDelete rnode val comp))))
+                      (or lnode rnode))))))
+  (doInsertCopy [this item comp]
+    (with-comparator comp res item x
+      (let [^INode rnode @r
+            ^INode lnode @l]
+        (cond
+         (= res 0) this
+         (= res 1) (if rnode
+                     (make-trans-node val lnode (.doInsertCopy rnode item comp))
+                     (make-trans-node val lnode (make-trans-node item)))
+                     
+         :else     (if lnode
+                     (make-trans-node (.doInsertCopy lnode item comp) rnode)
+                     (make-trans-node (make-trans-node item) rnode))))))
+  
+  (doDeleteCopy [this item comp]
+    (with-comparator comp res item x
+      (let [^INode rnode @r
+            ^INode lnode @l]
+        (cond
+         (= res  1) (if rnode
+                      (make-trans-node lnode (.doDeleteCopy rnode item comp))
+                      this)
+                      
+         (= res -1) (if lnode
+                      (make-trans-node (.doDeleteCopy lnode item comp) rnode)
+                      this)
+                      
+         :else      (if (and lnode rnode)
+                      (let [^INode successor (loop [^INode node rnode]
+                                               (let [smaller (.left node)]
+                                                 (if smaller
+                                                   (recur smaller)
+                                                   node)))
+                            val (.value successor)]
+                        (if (identical? rnode successor)
+                          (make-trans-node val lnode (.right rnode))
+                          (make-trans-node val lnode (.doDeleteCopy rnode val comp))))
                       (or lnode rnode))))))
   
   (retrieve [this item comp]
