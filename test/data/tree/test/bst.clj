@@ -82,11 +82,11 @@
 
 
 
-;;  Node Tests
-(defmacro node-insertion-tests
-  [name ins-fn tree]
+;;  Operation Tests
+(defmacro insertion-tests
+  [name ins-fn acc-fn tree]
   `(deftest ~name
-     (are [t x r] (identical-structure? (~ins-fn (t ~tree) x) r)
+     (are [t x r] (identical-structure? (~acc-fn (~ins-fn (t ~tree) x)) r)
           :leaf      10   '(50 10  nil)
           :leaf      60   '(50 nil 60 )
           :leaf      50   50
@@ -99,10 +99,10 @@
           :s-full    20   '(50 (25 20 nil) 75)
           :s-full    80   '(50 25 (75 nil 80)))))
 
-(defmacro node-deletion-tests
-  [name del-fn tree]
+(defmacro deletion-tests
+  [name del-fn acc-fn tree]
   `(deftest ~name
-     (are [t x r] (identical-structure? (~del-fn (t ~tree) x) r)
+     (are [t x r] (identical-structure? (~acc-fn (~del-fn (t ~tree) x)) r)
           :leaf      50   nil
           :leaf      99   50
           :leaf      40   50
@@ -117,7 +117,7 @@
           :m-righty  75  '(50 nil 80)
           :m-righty  80  '(50 nil 75))))
 
-(defmacro node-retrieval-tests
+(defmacro retrieval-tests
   [name ret-fn tree]
   `(deftest ~name
      (are [t x r] (= (~ret-fn (t ~tree) x) r)
@@ -142,16 +142,19 @@
           :l-full    79  nil
           :l-full    19  nil)))
 
-(node-insertion-tests transient-doinsert doins-def (make-transients))
-(node-insertion-tests transient-insert   ins-def   transients)
-(node-insertion-tests persistent-insert  ins-def   trees)
+(insertion-tests transient-doinsert doins-def identity (make-transients))
+(insertion-tests transient-insert   ins-def   identity transients)
+(insertion-tests persistent-insert  ins-def   identity trees)
+(insertion-tests bst-insert         conj      .tree    bsts)
 
-(node-deletion-tests transient-dodelete dodel-def (make-transients))
-(node-deletion-tests transient-delete   del-def   transients)
-(node-deletion-tests persistent-delete  del-def   trees)
+(deletion-tests transient-dodelete dodel-def identity (make-transients))
+(deletion-tests transient-delete   del-def   identity transients)
+(deletion-tests persistent-delete  del-def   identity trees)
+(deletion-tests bst-delete         disj      .tree    bsts)
 
-(node-retrieval-tests transient-retrieve  ret-def transients)
-(node-retrieval-tests persistent-retrieve ret-def trees)
+(retrieval-tests transient-retrieve  ret-def transients)
+(retrieval-tests persistent-retrieve ret-def trees)
+(retrieval-tests bst-retrieve        get     bsts)
 
 ;;==== Helper Functions ====
 
