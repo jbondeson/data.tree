@@ -15,6 +15,9 @@
 (def ^:private build
   (ns-resolve 'data.tree.bst 'build-tree)) 
 
+(def ^:private make-trans-node
+  (ns-resolve 'data.tree.bst 'make-trans-node))
+
 (defn build-def
   [& args]
   (build c args))
@@ -23,9 +26,7 @@
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
-          eleft (into-array INode [nil])
-          eright (into-array INode [nil])
-          root (TransNode. x eleft eright)
+          root (make-trans-node x)
           ins (fn [[^INode t cnt] v] [(.doInsert t v c) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
@@ -76,64 +77,77 @@
 ;;  Binary Search Tree Tests
 
 
+
 ;;  Node Tests
-(deftest node-insertion
-  (are [t x r] (identical-structure? (ins-def (t trees) x) r)
-       :leaf      10   '(50 10  nil)
-       :leaf      60   '(50 nil 60 )
-       :leaf      50   50
-       :s-lefty   75   '(50 25 75)
-       :s-lefty   20   '(50 (25 20 nil) nil)
-       :s-lefty   50   '(50 25 nil)
-       :s-righty  25   '(50 25 75)
-       :s-righty  80   '(50 nil (75 nil 80))
-       :s-righty  50   '(50 nil 75)
-       :s-full    20   '(50 (25 20 nil) 75)
-       :s-full    80   '(50 25 (75 nil 80))))
+(defmacro node-insertion-tests
+  [name ins-fn tree]
+  `(deftest ~name
+     (are [t x r] (identical-structure? (~ins-fn (t ~tree) x) r)
+          :leaf      10   '(50 10  nil)
+          :leaf      60   '(50 nil 60 )
+          :leaf      50   50
+          :s-lefty   75   '(50 25 75)
+          :s-lefty   20   '(50 (25 20 nil) nil)
+          :s-lefty   50   '(50 25 nil)
+          :s-righty  25   '(50 25 75)
+          :s-righty  80   '(50 nil (75 nil 80))
+          :s-righty  50   '(50 nil 75)
+          :s-full    20   '(50 (25 20 nil) 75)
+          :s-full    80   '(50 25 (75 nil 80)))))
 
-(deftest node-deletion
-  (are [t x r] (identical-structure? (del-def (t trees) x) r)
-       :leaf      50   nil
-       :leaf      99   50
-       :leaf      40   50
-       :s-lefty   50   25
-       :s-lefty   25   50
-       :m-lefty   50  '(25 20 nil)
-       :m-lefty   25  '(50 20 nil)
-       :m-lefty   20  '(50 25 nil)
-       :s-righty  50   75
-       :s-righty  75   50
-       :m-righty  50  '(75 nil 80)
-       :m-righty  75  '(50 nil 80)
-       :m-righty  80  '(50 nil 75)
-       :s-full    50  '(75 25 nil)
-       :s-full    25  '(50 nil 75)
-       :s-full    75  '(50 25 nil)
-       :l-full    50  '(65 (25 15 35) (75 nil 85))))
+(defmacro node-deletion-tests
+  [name del-fn tree]
+  `(deftest ~name
+     (are [t x r] (identical-structure? (~del-fn (t ~tree) x) r)
+          :leaf      50   nil
+          :leaf      99   50
+          :leaf      40   50
+          :s-lefty   50   25
+          :s-lefty   25   50
+          :m-lefty   50  '(25 20 nil)
+          :m-lefty   25  '(50 20 nil)
+          :m-lefty   20  '(50 25 nil)
+          :s-righty  50   75
+          :s-righty  75   50
+          :m-righty  50  '(75 nil 80)
+          :m-righty  75  '(50 nil 80)
+          :m-righty  80  '(50 nil 75))))
 
-(deftest node-retrieve
-  (are [t x r] (= (ret-def (t trees) x) r)
-       :leaf      50  50
-       :leaf      99  nil
-       :leaf      40  nil
-       :l-lefty   50  50
-       :l-lefty   99  nil
-       :l-lefty   25  25
-       :l-lefty   5   5
-       :l-lefty   19  nil
-       :l-righty  50  50
-       :l-righty  40  nil
-       :l-righty  75  75
-       :l-righty  95  95
-       :l-righty  89  nil
-       :l-full    50  50
-       :l-full    25  25
-       :l-full    75  75
-       :l-full    15  15
-       :l-full    85  85
-       :l-full    79  nil
-       :l-full    19  nil))
+(defmacro node-retrieval-tests
+  [name ret-fn tree]
+  `(deftest ~name
+     (are [t x r] (= (~ret-fn (t ~tree) x) r)
+          :leaf      50  50
+          :leaf      99  nil
+          :leaf      40  nil
+          :l-lefty   50  50
+          :l-lefty   99  nil
+          :l-lefty   25  25
+          :l-lefty   5   5
+          :l-lefty   19  nil
+          :l-righty  50  50
+          :l-righty  40  nil
+          :l-righty  75  75
+          :l-righty  95  95
+          :l-righty  89  nil
+          :l-full    50  50
+          :l-full    25  25
+          :l-full    75  75
+          :l-full    15  15
+          :l-full    85  85
+          :l-full    79  nil
+          :l-full    19  nil)))
 
+;;(node-insertion-tests transient-doinsert doins-def transients)
+(node-insertion-tests transient-insert   ins-def   transients)
+(node-insertion-tests persistent-insert  ins-def   trees)
+
+;;(node-deletion-tests transient-doinsert dodel-def transients)
+(node-deletion-tests transient-delete   del-def   transients)
+(node-deletion-tests persistent-delete  del-def   trees)
+
+(node-retrieval-tests transient-retrieve  ret-def transients)
+(node-retrieval-tests persistent-retrieve ret-def trees)
 
 ;;==== Helper Functions ====
 
