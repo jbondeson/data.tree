@@ -2,8 +2,7 @@
       :author "Jeremy Bondeson"}
   data.tree.bst
   (:refer-clojure :exclude [comparator comp])
-  (:require [data.tree.quickref :as qref])
-  (:require [data.util :as util])
+  (:require [data.util.tref :as tref])
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
                          Reversible IEditableCollection)))
@@ -277,13 +276,13 @@
          (= res 0) this
          (= res 1) (do
                      (if rnode
-                       (util/set! r (.doInsert rnode item comp))
-                       (util/set! r (make-trans-node item)))
+                       (tref/set! r (.doInsert rnode item comp))
+                       (tref/set! r (make-trans-node item)))
                      this)
          :else     (do
                      (if lnode
-                       (util/set! l  (.doInsert lnode item comp))
-                       (util/set! l (make-trans-node item)))
+                       (tref/set! l  (.doInsert lnode item comp))
+                       (tref/set! l (make-trans-node item)))
                      this)))))
   (doDelete [this item comp]
     (with-comparator comp res item x
@@ -292,11 +291,11 @@
         (cond
          (= res  1) (do
                       (when rnode
-                        (util/set! r (.doDelete rnode item comp)))
+                        (tref/set! r (.doDelete rnode item comp)))
                       this)
          (= res -1) (do
                       (when lnode
-                        (util/set! l (.doDelete lnode item comp)))
+                        (tref/set! l (.doDelete lnode item comp)))
                       this)
          :else      (if (and lnode rnode)
                       (let [^INode successor (loop [^INode node rnode]
@@ -336,9 +335,9 @@
 
 (defn- make-trans-node
   ([item]
-     (TransNode. item (util/thread-ref nil) (util/thread-ref nil)))
+     (TransNode. item (tref/thread-ref nil) (tref/thread-ref nil)))
   ([item ^INode left ^INode right]
-     (TransNode. item (util/thread-ref left) (util/thread-ref right))))
+     (TransNode. item (tref/thread-ref left) (tref/thread-ref right))))
 
 
 ;;=======  Seq Implementation   =======;;
