@@ -231,7 +231,7 @@
                     (and lnode rnode) (make-full-node x (.insert lnode item comp) rnode)
                     lnode             (make-lefty-node x (.insert lnode item comp))
                     rnode             (make-full-node x (make-leaf-node item) rnode)
-                    :else             (make-lefty-node x (make-lefty-node item)))))))
+                    :else             (make-lefty-node x (make-leaf-node item)))))))
 
   (delete [this item comp]
     (let [^INode lnode @l
