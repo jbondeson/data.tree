@@ -1,15 +1,17 @@
 (ns ^{:doc "Reference object to data structures"
       :author "Jeremy Bondeson"}
     data.util.tref
-    (:import (data.util ThreadBoundRef)))
+    (:import (data.util ThreadBoundRef EditContext)))
 
 (set! *warn-on-reflection* true)
 
 (defn thread-bound-ref ^data.util.ThreadBoundRef
   ^{:inline (fn [v] `(ThreadBoundRef. v))
     :inline-arities #{1}}
-  [value]
-  (ThreadBoundRef. value))
+  ([value]
+     (ThreadBoundRef. value))
+  ([value ^data.util.EditContext edit]
+     (ThreadBoundRef. value edit)))
 
 (defn set!
   ^{:inline (fn [^data.util.ThreadBoundRef r v] `(.set r v))

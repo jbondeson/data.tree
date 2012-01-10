@@ -6,13 +6,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class ThreadBoundRef implements IDeref {
     private Object _val;
-    private final AtomicReference<Thread>  _edit;
+    private final EditContext  _edit;
 
     public ThreadBoundRef(Object val) {
-        this(val, new AtomicReference<Thread>(Thread.currentThread()));
+        this(val, new EditContext());
     }
 
-    public ThreadBoundRef(Object val, AtomicReference<Thread> edit) {
+    public ThreadBoundRef(Object val, EditContext edit) {
         this._val = val;
         this._edit = edit;
     }
@@ -22,22 +22,8 @@ public class ThreadBoundRef implements IDeref {
     }
 
     public Object set(Object val) {
-        ensureEditable();
+        this._edit.ensureEditable();
         this._val = val;
         return this._val;
-    }
-
-    public ThreadBoundRef freeze() {
-        this._edit.set(null);
-        return this;
-    }
-
-    void ensureEditable() {
-        Thread owner = this._edit.get();
-        if(owner == Thread.currentThread())
-            return;
-        if(owner != null)
-            throw new IllegalAccessError("Reference used by non-owner thread");
-        throw new IllegalAccessError("Reference used after freeze! call");
     }
 }
