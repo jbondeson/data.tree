@@ -545,7 +545,7 @@
     (BinarySearchTree. mdata comparator (.insert tree item comparator) (inc count)))
   IPersistentSet
   (disjoin [this item]
-    (BinarySearchTree. mdata comparator (.delete tree item comparator) (inc count)))
+    (BinarySearchTree. mdata comparator (.delete tree item comparator) (dec count)))
   (contains [this x] (not (nil? (.get this x))))
   (get [_ x] (.retrieve tree x comparator))
   Sorted
