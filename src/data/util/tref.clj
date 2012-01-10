@@ -1,26 +1,26 @@
 (ns ^{:doc "Reference object to data structures"
       :author "Jeremy Bondeson"}
     data.util.tref
-    (:import (data.util ThreadRef)))
+    (:import (data.util ThreadBoundRef)))
 
 (set! *warn-on-reflection* true)
 
-(defn thread-ref
-  ^{:inline (fn [v] `(ThreadRef. v))
+(defn thread-bound-ref ^data.util.ThreadBoundRef
+  ^{:inline (fn [v] `(ThreadBoundRef. v))
     :inline-arities #{1}}
   [value]
-  (ThreadRef. value))
+  (ThreadBoundRef. value))
 
 (defn set!
-  ^{:inline (fn [r v] `(.set r v))
+  ^{:inline (fn [^data.util.ThreadBoundRef r v] `(.set r v))
     :inline-arities #{2}}
-  [^data.util.ThreadRef ref value]
+  [^data.util.ThreadBoundRef ref value]
   (.set ref value))
 
 (defn freeze!
-  ^{:inline (fn [r] `(.freeze r))
+  ^{:inline (fn [^data.util.ThreadBoundRef r] `(.freeze r))
     :inline-arities #{1}}
-  [^data.util.ThreadRef ref]
+  [^data.util.ThreadBoundRef ref]
   (.freeze ref))
 
 (comment

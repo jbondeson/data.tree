@@ -382,9 +382,9 @@
 
 (defn- make-trans-node
   ([item]
-     (TransNode. item (tref/thread-ref nil) (tref/thread-ref nil)))
+     (TransNode. item (tref/thread-bound-ref nil) (tref/thread-bound-ref nil)))
   ([item ^INode left ^INode right]
-     (TransNode. item (tref/thread-ref left) (tref/thread-ref right))))
+     (TransNode. item (tref/thread-bound-ref left) (tref/thread-bound-ref right))))
 
 
 ;;=======  Seq Implementation   =======;;
