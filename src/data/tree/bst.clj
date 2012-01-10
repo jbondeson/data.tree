@@ -3,6 +3,7 @@
   data.tree.bst
   (:refer-clojure :exclude [comparator comp])
   (:require [data.tree.quickref :as qref])
+  (:require [data.util :as util])
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
                          Reversible IEditableCollection)))
@@ -214,27 +215,11 @@
   (left [_] l)
   (right [_] r))
 
-;;(qref/def-create inode-ref INode)
-;;(qref/def-deref inode-deref INode)
-;;(qref/def-set inode-set! INode)
-
-(defn- inode-ref ^"[Ldata.tree.bst.INode;" 
-  [^INode value]
-  (into-array INode [value]))
-
-(defn- inode-deref ^INode
-  [^"[Ldata.tree.bst.INode;" ref]
-  (aget ^"[Ldata.tree.bst.INode;" ref (int 0)))
-
-(defn- inode-set!
-  [^"[Ldata.tree.bst.INode;" ref ^INode value]
-  (aset ^"[Ldata.tree.bst.INode;" ref (int 0) value))
-
 (deftype TransNode [x l r]
   INode
   (insert [this item comp]
-    (let [^INode lnode (inode-deref l)
-          ^INode rnode (inode-deref r)]
+    (let [^INode lnode @l
+          ^INode rnode @r]
       (with-comparator comp res item x
         (cond
          (= res 0) this
@@ -250,8 +235,8 @@
                     :else             (make-lefty-node x (make-lefty-node item)))))))
 
   (delete [this item comp]
-    (let [^INode lnode (inode-deref l)
-          ^INode rnode (inode-deref r)]
+    (let [^INode lnode @l
+          ^INode rnode @r]
       (with-comparator comp res item x
         (cond
          (= res -1) (if lnode
@@ -286,32 +271,32 @@
 
   (doInsert [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode (inode-deref r)
-            ^INode lnode (inode-deref l)]
+      (let [^INode rnode @r
+            ^INode lnode @l]
         (cond
          (= res 0) this
          (= res 1) (do
                      (if rnode
-                       (inode-set! r (.doInsert rnode item comp))
-                       (inode-set! r (make-trans-node item)))
+                       (util/set! r (.doInsert rnode item comp))
+                       (util/set! r (make-trans-node item)))
                      this)
          :else     (do
                      (if lnode
-                       (inode-set! l  (.doInsert lnode item comp))
-                       (inode-set! l (make-trans-node item)))
+                       (util/set! l  (.doInsert lnode item comp))
+                       (util/set! l (make-trans-node item)))
                      this)))))
   (doDelete [this item comp]
     (with-comparator comp res item x
-      (let [^INode rnode (inode-deref r)
-            ^INode lnode (inode-deref l)]
+      (let [^INode rnode @r
+            ^INode lnode @l]
         (cond
          (= res  1) (do
                       (when rnode
-                        (inode-set! r (.doDelete rnode item comp)))
+                        (util/set! r (.doDelete rnode item comp)))
                       this)
          (= res -1) (do
                       (when lnode
-                        (inode-set! l (.doDelete lnode item comp)))
+                        (util/set! l (.doDelete lnode item comp)))
                       this)
          :else      (if (and lnode rnode)
                       (let [^INode successor (loop [^INode node rnode]
@@ -326,16 +311,16 @@
                       (or lnode rnode))))))
   
   (retrieve [this item comp]
-    (let [^INode lnode (inode-deref l)
-          ^INode rnode (inode-deref r)]
+    (let [^INode lnode @l
+          ^INode rnode @r]
       (with-comparator comp res item x
         (cond
          (= res 0)  x
          (and (= res -1) lnode) (.retrieve lnode item comp)
          (and (= res  1) rnode) (.retrieve rnode item comp)))))
   (value [_] x)
-  (left [_] (inode-deref l))
-  (right [_] (inode-deref r)))
+  (left [_] @l)
+  (right [_] @r))
 
 (defn- make-leaf-node [item]
   (LeafNode. item))
@@ -351,9 +336,9 @@
 
 (defn- make-trans-node
   ([item]
-     (TransNode. item (inode-ref nil) (inode-ref nil)))
+     (TransNode. item (util/thread-ref nil) (util/thread-ref nil)))
   ([item ^INode left ^INode right]
-     (TransNode. item (inode-ref left) (inode-ref right))))
+     (TransNode. item (util/thread-ref left) (util/thread-ref right))))
 
 
 ;;=======  Seq Implementation   =======;;

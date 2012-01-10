@@ -98,7 +98,6 @@
         (dotimes [k set-times]
           (buh-set! iref nil))))))
 
-
 ;; Tree Ops
 (defn tree-trans-time []
   (let [coll (balanced-seq 10000)] 
