@@ -1,6 +1,7 @@
 (ns data.tree.test.bst
   (:use [data.tree.bst])
   (:use [clojure.test])
+  (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [clojurecheck.core :as cc])
   (:require [data.util.tref :as tref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
@@ -81,8 +82,39 @@
     (is (identical? e (empty e)))))
 
 ;;  Binary Search Tree Tests
+(defmacro ^:private tree-prop
+  [msg tree set items & body]
+  `(cc/property
+    ~msg
+    [~items (cc/list (cc/int :lower 0 :upper 32767))]
+    (let [~tree (apply binary-search-tree ~items)
+          ~set (apply sorted-set ~items)]
+      ~@body)))
 
-
+(deftest binary-search-tree-properties
+  (tree-prop
+   "ascending sequence"
+   tree set list
+   (is (= (seq set) (seq tree))))
+  (tree-prop
+   "descending sequence"
+   tree set list
+   (is (= (seq (reverse set)) (rseq tree))))
+  (tree-prop
+   "count"
+   tree set list
+   (is (= (count set) (count tree))))
+  (tree-prop
+   "seq from"
+   tree set list
+   (let [from (if (seq list)
+                (nth list (int (/ (count list) 2)))
+                nil)]
+     (is (= (seq (.seqFrom set from true)) (seq (.seqFrom tree from true))))))  
+  (tree-prop
+   "member tests"
+   tree set items
+   (is (every? #(= (contains? set %) (contains? tree %)) items))))
 
 ;;  Operation Tests
 (defmacro insertion-tests
@@ -152,7 +184,9 @@
 (deletion-tests transient-dodelete dodel-def identity (make-transients))
 (deletion-tests transient-delete   del-def   identity transients)
 (deletion-tests persistent-delete  del-def   identity trees)
-(deletion-tests bst-delete         disj      .tree    bsts)
+(deletion-tests bst-delete         disj      #(if (isa? (type %) EmptyBinarySearchTree)
+                                                nil
+                                                (.tree %))    bsts)
 
 (retrieval-tests transient-retrieve  ret-def transients)
 (retrieval-tests persistent-retrieve ret-def trees)
@@ -161,11 +195,28 @@
 ;;==== Helper Functions ====
 
 ;; Alias node functions to take the default comparator
-(defn ins-def [^INode tree item] (.insert tree item c))
-(defn del-def [^INode tree item] (.delete tree item c))
-(defn ret-def [^INode tree item] (.retrieve tree item c))
-(defn doins-def [^INode tree item] (.doInsert tree (tref/edit-context) item c))
-(defn dodel-def [^INode tree item] (.doDelete tree (tref/edit-context) item c))
+(defn ins-def [^INode tree item]
+  (try+
+   (.insert tree item c)
+   (catch :duplicate-key? _
+     tree)))
+(defn del-def [^INode tree item]
+  (try+
+   (.delete tree item c)
+   (catch :not-found? _
+     tree)))
+(defn ret-def [^INode tree item]
+  (.retrieve tree item c))
+(defn doins-def [^INode tree item]
+  (try+
+   (.doInsert tree (tref/edit-context) item c)
+   (catch :duplicate-key? _
+     tree)))
+(defn dodel-def [^INode tree item]
+  (try+
+   (.doDelete tree (tref/edit-context) item c)
+   (catch :not-found? _
+     tree)))
 
 (defn flatten-tree [^INode tree]
   (loop [res '[]
