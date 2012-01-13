@@ -5,9 +5,15 @@
 
 (set! *warn-on-reflection* true)
 
+(defn edit-context
+  ^{:inline (fn [] `(EditContext.))
+    :inline-arities #{0}}
+  []
+  (EditContext.))
+
 (defn thread-bound-ref ^data.util.ThreadBoundRef
-  ^{:inline (fn [v] `(ThreadBoundRef. v))
-    :inline-arities #{1}}
+  ^{:inline (fn [v e] `(ThreadBoundRef. v e))
+    :inline-arities #{2}}
   ([value]
      (ThreadBoundRef. value))
   ([value ^data.util.EditContext edit]
@@ -19,14 +25,6 @@
   [^data.util.ThreadBoundRef ref value]
   (.set ref value))
 
-(defn freeze!
-  ^{:inline (fn [^data.util.ThreadBoundRef r] `(.freeze r))
-    :inline-arities #{1}}
+(defn editable?
   [^data.util.ThreadBoundRef ref]
-  (.freeze ref))
-
-(comment
-  (let [r (thread-ref 1)]
-    (prn @r)
-    (ref-set! r 2)
-    (prn @r)))
+  (.isEditable ref))
