@@ -26,4 +26,8 @@ public class ThreadBoundRef implements IDeref {
         this._val = val;
         return this._val;
     }
+
+    public boolean isEditable() {
+        return this._edit.isEditable();
+    }
 }
