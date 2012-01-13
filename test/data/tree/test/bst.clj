@@ -1,7 +1,8 @@
 (ns data.tree.test.bst
   (:use [data.tree.bst])
   (:use [clojure.test])
-  (:require [data.tree.quickref :as qref])
+  (:require [clojurecheck.core :as cc])
+  (:require [data.util.tref :as tref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
                           LeafNode LeftyNode RightyNode FullNode
                           TransNode
@@ -26,8 +27,9 @@
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
-          root (make-trans-node x)
-          ins (fn [[^INode t cnt] v] [(.doInsert t v c) (inc cnt)])]
+          edit (tref/edit-context)
+          root (make-trans-node edit x nil nil)
+          ins (fn [[^INode t cnt] v] [(.doInsert t edit v c) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
 
@@ -162,8 +164,8 @@
 (defn ins-def [^INode tree item] (.insert tree item c))
 (defn del-def [^INode tree item] (.delete tree item c))
 (defn ret-def [^INode tree item] (.retrieve tree item c))
-(defn doins-def [^INode tree item] (.doInsert tree item c))
-(defn dodel-def [^INode tree item] (.doDelete tree item c))
+(defn doins-def [^INode tree item] (.doInsert tree (tref/edit-context) item c))
+(defn dodel-def [^INode tree item] (.doDelete tree (tref/edit-context) item c))
 
 (defn flatten-tree [^INode tree]
   (loop [res '[]
