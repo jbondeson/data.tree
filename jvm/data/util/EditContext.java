@@ -17,6 +17,11 @@ public class EditContext {
         this._ctx.set(null);
     }
 
+    public boolean isEditable() {
+        Thread owner = this._ctx.get();
+        return (owner == Thread.currentThread());
+    }
+
     public void ensureEditable() {
         Thread owner = this._ctx.get();
         if(owner == Thread.currentThread())
