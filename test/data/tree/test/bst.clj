@@ -6,8 +6,6 @@
   (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
-                          LeafNode LeftyNode RightyNode FullNode
-                          TransNode
                           INode 
                           )))
 
