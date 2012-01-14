@@ -1,8 +1,6 @@
 package data.util;
 
-import clojure.lang.IRef;
 import clojure.lang.IDeref;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class ThreadBoundRef implements IDeref {
     private Object _val;
