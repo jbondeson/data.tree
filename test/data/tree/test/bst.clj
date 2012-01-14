@@ -3,15 +3,13 @@
   (:use [clojure.test])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [clojurecheck.core :as cc])
+  (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
                           LeafNode LeftyNode RightyNode FullNode
                           TransNode
                           INode 
                           )))
-
-(def ^:private c
-  clojure.lang.RT/DEFAULT_COMPARATOR)
 
 ;; Bring in some private methods from data.tree.bst
 (def ^:private build
@@ -30,7 +28,8 @@
     (let [[x & xs] coll
           edit (tref/edit-context)
           root (make-trans-node edit x nil nil)
-          ins (fn [[^INode t cnt] v] [(.doInsert t edit v c) (inc cnt)])]
+          ins (fn [[^INode t cnt] v]
+                [(.doInsert t edit v cmp/default) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
 
@@ -110,7 +109,9 @@
    (let [from (if (seq list)
                 (nth list (int (/ (count list) 2)))
                 nil)]
-     (is (= (seq (.seqFrom set from true)) (seq (.seqFrom tree from true))))))  
+     (is
+      (= (seq (.seqFrom set from true))
+         (seq (.seqFrom tree from true))))))  
   (tree-prop
    "member tests"
    tree set items
@@ -197,24 +198,24 @@
 ;; Alias node functions to take the default comparator
 (defn ins-def [^INode tree item]
   (try+
-   (.insert tree item c)
+   (.insert tree item cmp/default)
    (catch :duplicate-key? _
      tree)))
 (defn del-def [^INode tree item]
   (try+
-   (.delete tree item c)
+   (.delete tree item cmp/default)
    (catch :not-found? _
      tree)))
 (defn ret-def [^INode tree item]
-  (.retrieve tree item c))
+  (.retrieve tree item cmp/default))
 (defn doins-def [^INode tree item]
   (try+
-   (.doInsert tree (tref/edit-context) item c)
+   (.doInsert tree (tref/edit-context) item cmp/default)
    (catch :duplicate-key? _
      tree)))
 (defn dodel-def [^INode tree item]
   (try+
-   (.doDelete tree (tref/edit-context) item c)
+   (.doDelete tree (tref/edit-context) item cmp/default)
    (catch :not-found? _
      tree)))
 

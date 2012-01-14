@@ -3,6 +3,7 @@
   data.tree.bst
   (:refer-clojure :exclude [comparator comp])
   (:use [slingshot.slingshot :only [throw+ try+]])
+  (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
@@ -10,12 +11,6 @@
            (data.util EditContext)))
 
 (set! *warn-on-reflection* true)
-
-(defmacro with-comparator
-  "Macro to automate the binding of a comparator result"
-  ([^java.util.Comparator comparator result x y & body]
-     `(let [~result (int (.compare ~comparator ~x ~y))]
-        ~@body)))
 
 (definterface INode
   (^data.tree.bst.INode insert [item ^java.util.Comparator comp])
@@ -36,13 +31,13 @@
   INode
   (insert [this item comp]
     (let [leaf (make-leaf-node item)]
-      (with-comparator comp res item x
+      (cmp/with-compare comp res item x
         (cond
          (= res 0)  (throw+ {:duplicate-key? true})
          (= res -1) (make-lefty-node x leaf)
          :else      (make-righty-node x leaf)))))
   (delete [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (if (= res 0)
         nil
         (throw+ {:not-found? true}))))
@@ -50,18 +45,18 @@
   (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
   (doInsertCopy [this edit item comp]
     (let [leaf (make-trans-node edit item nil nil)]
-      (with-comparator comp res item x
+      (cmp/with-compare comp res item x
         (cond
          (= res 0)  (throw+ {:duplicate-key? true})
          (= res -1) (make-trans-node edit x leaf nil)
          :else      (make-trans-node edit x nil leaf)))))
   (doDeleteCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (if (= res 0)
         (throw+ {:not-found? true})
         this)))
   (retrieve [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (if (= res 0)
         x
         nil)))
@@ -72,13 +67,13 @@
 (deftype LeftyNode [x ^INode l]
   INode
   (insert [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
        (= res -1) (make-lefty-node x (.insert l item comp))
        :else      (make-full-node x l (make-leaf-node item)))))
   (delete [this item comp]
-     (with-comparator comp res item x
+     (cmp/with-compare comp res item x
       (cond
        (= res 0)  l
        (= res -1) (let [node (.delete l item comp)]
@@ -89,13 +84,13 @@
   (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
   (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
   (doInsertCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
        (= res -1) (make-trans-node edit x (.doInsertCopy l edit item comp) nil)
        :else      (make-trans-node edit x l (make-trans-node edit item nil nil)))))
   (doDeleteCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  l
        (= res -1) (let [node (.doDeleteCopy l edit item comp)]
@@ -104,7 +99,7 @@
                       (make-trans-node edit x nil nil)))
        :else      (throw+ {:not-found? true}))))
   (retrieve [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  x
        (= res -1) (.retrieve l item comp))))
@@ -115,13 +110,13 @@
 (deftype RightyNode [x ^INode r]
   INode
   (insert [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
        (= res 1) (make-righty-node x (.insert r item comp))
        :else     (make-full-node x (make-leaf-node item) r))))
   (delete [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) r
        (= res 1) (let [node (.delete r item comp)]
@@ -132,13 +127,13 @@
   (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
   (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
   (doInsertCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
        (= res 1) (make-trans-node edit x nil (.doInsertCopy r edit item comp))
        :else     (make-trans-node edit x (make-trans-node edit item nil nil) r))))
   (doDeleteCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) r
        (= res 1) (let [node (.doDeleteCopy r edit item comp)]
@@ -148,7 +143,7 @@
        :else      (throw+ {:not-found? true})))
     )
   (retrieve [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  x
        (= res 1) (.retrieve r item comp))))
@@ -159,13 +154,13 @@
 (deftype FullNode [x ^INode l ^INode r]
   INode
   (insert [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
        (= res 1) (make-full-node x l (.insert r item comp))
        :else     (make-full-node x (.insert l item comp) r))))
   (delete [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res  1) (let [rnode (.delete r item comp)]
                     (if rnode
@@ -189,13 +184,13 @@
   (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
   (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
   (doInsertCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
        (= res 1) (make-trans-node edit x l (.doInsertCopy r edit item comp))
        :else     (make-trans-node edit x (.doInsertCopy l edit item comp) r))))
   (doDeleteCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res  1) (let [rnode (.doDeleteCopy r edit item comp)]
                     (if rnode
@@ -217,7 +212,7 @@
                         (make-trans-node edit val l (.right r)))
                       (make-trans-node edit val l (.doDeleteCopy r edit val comp)))))))
   (retrieve [this item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (cond
        (= res 0)  x
        (= res 1) (.retrieve r item comp)
@@ -231,7 +226,7 @@
   (insert [this item comp]
     (let [^INode lnode @l
           ^INode rnode @r]
-      (with-comparator comp res item x
+      (cmp/with-compare comp res item x
         (cond
          (= res 0) (throw+ {:duplicate-key? true})
          (= res 1) (cond
@@ -248,7 +243,7 @@
   (delete [this item comp]
     (let [^INode lnode @l
           ^INode rnode @r]
-      (with-comparator comp res item x
+      (cmp/with-compare comp res item x
         (cond
          (= res -1) (if lnode
                       (let [node (.delete lnode item comp)]
@@ -280,7 +275,7 @@
                           (make-full-node val lnode (.delete rnode val comp))))
                       (or lnode rnode))))))
   (doInsert [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (let [^INode rnode @r
             ^INode lnode @l]
         (cond
@@ -296,7 +291,7 @@
                        (tref/set! l (make-trans-node edit item nil nil)))
                      this)))))
   (doDelete [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (let [^INode rnode @r
             ^INode lnode @l]
         (cond
@@ -320,7 +315,7 @@
                           (make-trans-node edit val lnode (.doDelete rnode edit val comp))))
                       (or lnode rnode))))))
   (doInsertCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (let [^INode rnode @r
             ^INode lnode @l]
         (cond
@@ -334,7 +329,7 @@
                      (make-trans-node edit val (make-trans-node edit item) rnode))))))
   
   (doDeleteCopy [this edit item comp]
-    (with-comparator comp res item x
+    (cmp/with-compare comp res item x
       (let [^INode rnode @r
             ^INode lnode @l]
         (cond
@@ -361,7 +356,7 @@
   (retrieve [this item comp]
     (let [^INode lnode @l
           ^INode rnode @r]
-      (with-comparator comp res item x
+      (cmp/with-compare comp res item x
         (cond
          (= res 0)  x
          (and (= res -1) lnode) (.retrieve lnode item comp)
@@ -573,7 +568,7 @@
            stack nil]
       (if (nil? node)
         (when stack (Seq. nil stack asc nil (Object.)))
-        (with-comparator comparator res item (.value node)
+        (cmp/with-compare comparator res item (.value node)
           (cond
            (= res  0)           (Seq. nil (cons node stack) asc nil (Object.))
            (and asc (= res -1)) (recur (.left node) (cons node stack))
@@ -587,9 +582,6 @@
 
 (defn- make-bst [mdata comparator tree count]
   (BinarySearchTree. mdata comparator tree count))
-
-(def ^:private def-comp
-  clojure.lang.RT/DEFAULT_COMPARATOR)
 
 (defn- ^:static build-tree
   "Returns a vector consisting of the tree and count of items"
@@ -608,17 +600,17 @@
 (defn ^:static binary-search-tree
   "Returns a new binary search tree with supplied keys."
   ([]
-     (EmptyBinarySearchTree. nil def-comp))
+     (EmptyBinarySearchTree. nil cmp/default))
   ([& keys]
-     (let [[tree count] (build-tree def-comp keys)]
-       (BinarySearchTree. nil def-comp tree count))))
+     (let [[tree count] (build-tree cmp/default keys)]
+       (BinarySearchTree. nil cmp/default tree count))))
 
 (defn ^:static binary-search-tree-by
   "Returns a new binary search tree with supplied keys, using the supplied comparator."
   ([^java.util.Comparator comparator]
      (EmptyBinarySearchTree. nil comparator))
   ([^java.util.Comparator comparator & keys]
-     (let [[tree count] (build-tree def-comp keys)]
+     (let [[tree count] (build-tree cmp/default keys)]
        (BinarySearchTree. nil comparator tree count))))
 
 ;;-- Transient Binary Search Tree
