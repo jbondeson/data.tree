@@ -18,7 +18,7 @@
 
 (defn build-def
   [& args]
-  (build c args))
+  (build cmp/default args))
 
 (defn build-trans-def
   [& args]
