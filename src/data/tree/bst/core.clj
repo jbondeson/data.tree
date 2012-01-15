@@ -1,397 +1,234 @@
-(ns ^{:doc "Persistent Binary Search Tree Core"
+(ns ^{:doc " Binary Search Tree Core"
       :author "Jeremy Bondeson"}
   data.tree.bst.core
   (:refer-clojure :exclude [comparator comp])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:use [data.tree.printable])
   (:require [data.compare :as cmp])
-  (:require [data.util.tref :as tref])
-  (:import (data.util EditContext))
-  )
+  (:import (java.util Comparator)))
 
-(definterface INode
-  (^data.tree.bst.core.INode insert [item ^java.util.Comparator comp])
-  (^data.tree.bst.core.INode delete [item ^java.util.Comparator comp])
-  (^data.tree.bst.core.INode doInsert [^data.util.EditContext edit item ^java.util.Comparator comp])
-  (^data.tree.bst.core.INode doDelete [^data.util.EditContext edit item ^java.util.Comparator comp])
-  (^data.tree.bst.core.INode doInsertCopy [^data.util.EditContext edit item ^java.util.Comparator comp])
-  (^data.tree.bst.core.INode doDeleteCopy [^data.util.EditContext edit item ^java.util.Comparator comp])
-  (retrieve [item ^java.util.Comparator comp])
-  (value [])
-  (left [])
-  (right []))
+(defprotocol INode
+  (^data.tree.bst.core.INode
+    insert [this item ^Comparator comp])
+  (^data.tree.bst.core.INode
+    delete [this item ^Comparator comp])
+  (retrieve [this item ^Comparator comp])
+  (^data.tree.bst.core.INode
+    left [this])
+  (^data.tree.bst.core.INode
+    right [this])
+  (value [this]))
 
-(declare make-leaf-node make-lefty-node make-righty-node make-full-node
-         make-trans-node)
+(defrecord LeafNode [value])
+(defrecord LeftyNode [value ^data.tree.bst.core.INode left])
+(defrecord RightyNode [value ^data.tree.bst.core.INode right])
+(defrecord FullNode [value ^data.tree.bst.core.INode left ^data.tree.bst.core.INode right])
 
-(deftype LeafNode [x]
-  INode
-  (insert [this item comp]
-    (let [leaf (make-leaf-node item)]
-      (cmp/with-compare comp res item x
-        (cond
-         (= res 0)  (throw+ {:duplicate-key? true})
-         (= res -1) (make-lefty-node x leaf)
-         :else      (make-righty-node x leaf)))))
-  (delete [this item comp]
-    (cmp/with-compare comp res item x
-      (if (= res 0)
-        nil
-        (throw+ {:not-found? true}))))
-  (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
-  (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
-  (doInsertCopy [this edit item comp]
-    (let [leaf (make-trans-node edit item nil nil)]
-      (cmp/with-compare comp res item x
-        (cond
-         (= res 0)  (throw+ {:duplicate-key? true})
-         (= res -1) (make-trans-node edit x leaf nil)
-         :else      (make-trans-node edit x nil leaf)))))
-  (doDeleteCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (if (= res 0)
-        (throw+ {:not-found? true})
-        this)))
-  (retrieve [this item comp]
-    (cmp/with-compare comp res item x
-      (if (= res 0)
-        x
-        nil)))
-  (value [this] x)
-  (left [this] nil)
-  (right [this] nil))
+(defn- ^:static const-nil [_] nil)
 
-(deftype LeftyNode [x ^INode l]
-  INode
-  (insert [this item comp]
-    (cmp/with-compare comp res item x
+;;-- Leaf Node Implementation
+
+(defn- ^data.tree.bst.core.INode
+  leaf-insert
+  [^LeafNode node item ^Comparator comp]
+  (let [val (:value node)
+        leaf (LeafNode. item)]
+    (cmp/with-compare comp res item val
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
-       (= res -1) (make-lefty-node x (.insert l item comp))
-       :else      (make-full-node x l (make-leaf-node item)))))
-  (delete [this item comp]
-     (cmp/with-compare comp res item x
-      (cond
-       (= res 0)  l
-       (= res -1) (let [node (.delete l item comp)]
-                    (if node
-                      (make-lefty-node x node)
-                      (make-leaf-node x)))
-       :else      (throw+ {:not-found? true}))))
-  (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
-  (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
-  (doInsertCopy [this edit item comp]
-    (cmp/with-compare comp res item x
+       (= res -1) (LeftyNode. val leaf)
+       :else      (RightyNode. val leaf)))))
+
+(defn- ^data.tree.bst.core.INode
+  leaf-delete
+  [^LeafNode node item ^Comparator comp]
+  (cmp/with-compare comp res item (:value node)
+    (when (not (= res 0))
+      (throw+ {:not-found? true}))))
+
+(defn- 
+  leaf-retrieve
+  [^LeafNode node item ^Comparator comp]
+  (cmp/with-compare comp res item (:value node)
+    (when  (= res 0)
+      (:value node))))
+
+(extend LeafNode
+  INode
+  {:insert leaf-insert
+   :delete leaf-delete
+   :retrieve leaf-retrieve
+   :left const-nil
+   :right const-nil
+   :value :value})
+
+;;-- Lefty Node Implementation
+
+(defn- 
+  ^data.tree.bst.core.INode lefty-insert
+  [^LeftyNode node item ^Comparator comp]
+  (let [val (:value node)
+        l   (:left node)]
+    (cmp/with-compare comp res item val
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
-       (= res -1) (make-trans-node edit x (.doInsertCopy l edit item comp) nil)
-       :else      (make-trans-node edit x l (make-trans-node edit item nil nil)))))
-  (doDeleteCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0)  l
-       (= res -1) (let [node (.doDeleteCopy l edit item comp)]
-                    (if node
-                      (make-trans-node edit x node nil)
-                      (make-trans-node edit x nil nil)))
-       :else      (throw+ {:not-found? true}))))
-  (retrieve [this item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0)  x
-       (= res -1) (.retrieve l item comp))))
-  (value [_] x)
-  (left [_] l)
-  (right [_] nil))
+       (= res -1) (LeftyNode. val (insert l item comp))
+       :else      (FullNode. val l (LeafNode. item))))))
 
-(deftype RightyNode [x ^INode r]
-  INode
-  (insert [this item comp]
-    (cmp/with-compare comp res item x
+(defn- 
+  ^data.tree.bst.core.INode lefty-delete
+  [^LeftyNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
       (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (make-righty-node x (.insert r item comp))
-       :else     (make-full-node x (make-leaf-node item) r))))
-  (delete [this item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0) r
-       (= res 1) (let [node (.delete r item comp)]
-                   (if node
-                     (make-righty-node x node)
-                     (make-leaf-node x)))
-       :else      (throw+ {:not-found? true}))))
-  (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
-  (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
-  (doInsertCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (make-trans-node edit x nil (.doInsertCopy r edit item comp))
-       :else     (make-trans-node edit x (make-trans-node edit item nil nil) r))))
-  (doDeleteCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0) r
-       (= res 1) (let [node (.doDeleteCopy r edit item comp)]
-                   (if node
-                     (make-trans-node edit x nil node)
-                     (make-trans-node edit x nil nil)))
-       :else      (throw+ {:not-found? true})))
-    )
-  (retrieve [this item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0)  x
-       (= res 1) (.retrieve r item comp))))
-  (value [_] x)
-  (left [_] nil)
-  (right [_] r))
+       (= res 0)  (:left node)
+       (= res -1) (let [nnode (delete (:left node) item comp)]
+                    (if nnode
+                      (LeftyNode. val nnode)
+                      (LeafNode. val)))
+       :else      (throw+ {:not-found? true})))))
 
-(deftype FullNode [x ^INode l ^INode r]
+(defn- 
+  lefty-retrieve
+  [^LeftyNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
+      (cond
+       (= res 0)  val
+       (= res -1) (retrieve (:left node) item comp)))))
+
+(extend LeftyNode
   INode
-  (insert [this item comp]
-    (cmp/with-compare comp res item x
+  {:insert lefty-insert
+   :delete lefty-delete
+   :retrieve lefty-retrieve
+   :left :left
+   :right const-nil
+   :value :value})
+
+;;-- Righty Node Implementation
+(defn- ^data.tree.bst.core.INode
+  righty-insert
+  [^RightyNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (make-full-node x l (.insert r item comp))
-       :else     (make-full-node x (.insert l item comp) r))))
-  (delete [this item comp]
-    (cmp/with-compare comp res item x
+       (= res 1) (RightyNode. val (insert (:right node) item comp))
+       :else     (FullNode. val (LeafNode. item) (:right node))))))
+
+(defn- ^data.tree.bst.core.INode
+  righty-delete
+  [^RightyNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
       (cond
-       (= res  1) (let [rnode (.delete r item comp)]
+       (= res 0) (:right node)
+       (= res 1) (let [nnode (delete (:right node) item comp)]
+                   (if nnode
+                     (RightyNode. val nnode)
+                     (LeafNode. val)))
+       :else      (throw+ {:not-found? true})))))
+
+(defn-
+  righty-retrieve
+  [^RightyNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
+      (cond
+       (= res 0)  val
+       (= res 1) (retrieve (:right node) item comp)))))
+
+(extend RightyNode
+  INode
+  {:insert righty-insert
+   :delete righty-delete
+   :retrieve righty-retrieve
+   :left const-nil
+   :right :right
+   :value :value})
+
+;;-- Full Node Implementation
+
+(defn- ^data.tree.bst.core.INode
+  full-insert
+  [^FullNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
+      (cond
+       (= res 0) (throw+ {:duplicate-key? true})
+       (= res 1) (FullNode. val (:left node) (insert (:right node) item comp))
+       :else     (FullNode. val (insert (:left node) item comp) (:right node))))))
+
+(defn- ^data.tree.bst.core.INode
+  full-delete
+  [^FullNode node item ^Comparator comp]
+  (let [val (:value node)
+        l   (:left node)
+        r   (:right node)]
+    (cmp/with-compare comp res item val
+      (cond
+       (= res  1) (let [rnode (delete r item comp)]
                     (if rnode
-                      (make-full-node x l rnode)
-                      (make-lefty-node x l)))
-       (= res -1) (let [lnode (.delete l item comp)]
+                      (FullNode. val l rnode)
+                      (LeftyNode. val l)))
+       (= res -1) (let [lnode (delete l item comp)]
                     (if lnode
-                      (make-full-node x lnode r)
-                      (make-righty-node x r)))
-       :else      (let [^INode successor (loop [^INode node r]
-                                           (let [smaller (.left node)]
-                                             (if (nil? smaller)
-                                               node
-                                               (recur smaller))))
-                        val (.value successor)]
+                      (FullNode. val lnode r)
+                      (RightyNode. val r)))
+       :else      (let [^data.tree.bst.core.INode
+                        successor (loop [^data.tree.bst.core.INode nnode r]
+                                    (let [smaller (.left nnode)]
+                                      (if (nil? smaller)
+                                        nnode
+                                        (recur smaller))))
+                        nval (value successor)]
                     (if (identical? r successor)
-                      (if (nil? (.right r))
-                        (make-lefty-node val l)
-                        (make-full-node val l (.right r)))
-                      (make-full-node val l (.delete r val comp)))))))
-  (doInsert [this edit item comp] (.doInsertCopy this edit item comp))
-  (doDelete [this edit item comp] (.doDeleteCopy this edit item comp))
-  (doInsertCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (make-trans-node edit x l (.doInsertCopy r edit item comp))
-       :else     (make-trans-node edit x (.doInsertCopy l edit item comp) r))))
-  (doDeleteCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res  1) (let [rnode (.doDeleteCopy r edit item comp)]
-                    (if rnode
-                      (make-trans-node edit x l rnode)
-                      (make-trans-node edit x l nil)))
-       (= res -1) (let [lnode (.doDeleteCopy l edit item comp)]
-                    (if lnode
-                      (make-trans-node edit x lnode r)
-                      (make-trans-node edit x nil r)))
-       :else      (let [^INode successor (loop [^INode node r]
-                                           (let [smaller (.left node)]
-                                             (if (nil? smaller)
-                                               node
-                                               (recur smaller))))
-                        val (.value successor)]
-                    (if (identical? r successor)
-                      (if (nil? (.right r))
-                        (make-trans-node edit val l nil)
-                        (make-trans-node edit val l (.right r)))
-                      (make-trans-node edit val l (.doDeleteCopy r edit val comp)))))))
-  (retrieve [this item comp]
-    (cmp/with-compare comp res item x
-      (cond
-       (= res 0)  x
-       (= res 1) (.retrieve r item comp)
-       :else     (.retrieve l item comp))))
-  (value [_] x)
-  (left [_] l)
-  (right [_] r))
+                      (if (nil? (right r))
+                        (LeftyNode. nval l)
+                        (FullNode. nval l (right r)))
+                      (FullNode. nval l (delete r nval comp))))))))
 
-(deftype TransNode [x l r]
+(defn-
+  full-retrieve
+  [^FullNode node item ^Comparator comp]
+  (let [val (:value node)]
+    (cmp/with-compare comp res item val
+      (cond
+       (= res 0)  val
+       (= res 1) (retrieve (:right node) item comp)
+       :else     (retrieve (:left node) item comp)))))
+
+(extend FullNode
   INode
-  (insert [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
-      (cmp/with-compare comp res item x
-        (cond
-         (= res 0) (throw+ {:duplicate-key? true})
-         (= res 1) (cond
-                    (and lnode rnode) (make-full-node x lnode (.insert rnode item comp))
-                    rnode             (make-righty-node x (.insert rnode item comp))
-                    lnode             (make-full-node x lnode (make-leaf-node item))
-                    :else             (make-righty-node x (make-leaf-node item)))
-         :else     (cond
-                    (and lnode rnode) (make-full-node x (.insert lnode item comp) rnode)
-                    lnode             (make-lefty-node x (.insert lnode item comp))
-                    rnode             (make-full-node x (make-leaf-node item) rnode)
-                    :else             (make-lefty-node x (make-leaf-node item)))))))
+  {:insert full-insert
+   :delete full-delete
+   :retrieve full-retrieve
+   :left :left
+   :right :right
+   :value :value})
 
-  (delete [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
-      (cmp/with-compare comp res item x
-        (cond
-         (= res -1) (if lnode
-                      (let [node (.delete lnode item comp)]
-                        (cond
-                         (and node rnode) (make-full-node x node rnode)
-                         node             (make-lefty-node x node)
-                         rnode            (make-righty-node x rnode)
-                         :else            (make-leaf-node x)))
-                      (throw+ {:not-found? true}))
-         (= res  1) (if rnode
-                      (let [node (.delete rnode item comp)]
-                        (cond
-                         (and node lnode) (make-full-node x lnode node)
-                         node             (make-righty-node x node)
-                         lnode            (make-lefty-node x lnode)
-                         :else            (make-leaf-node x)))
-                      (throw+ {:not-found? true}))
-         :else      (if (and lnode rnode)
-                      (let [^INode successor (loop [^INode node r]
-                                               (let [smaller (.left node)]
-                                                 (if smaller
-                                                   (recur smaller)
-                                                   node)))
-                            val (.value successor)]
-                        (if (identical? rnode successor)
-                          (if (.right rnode)
-                            (make-full-node val lnode (.right rnode))
-                            (make-lefty-node val lnode))
-                          (make-full-node val lnode (.delete rnode val comp))))
-                      (or lnode rnode))))))
-  (doInsert [this edit item comp]
-    (cmp/with-compare comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
-        (cond
-         (= res 0) (throw+ {:duplicate-key? true})
-         (= res 1) (do
-                     (if rnode
-                       (tref/set! r (.doInsert rnode edit item comp))
-                       (tref/set! r (make-trans-node edit item nil nil)))
-                     this)
-         :else     (do
-                     (if lnode
-                       (tref/set! l  (.doInsert lnode edit item comp))
-                       (tref/set! l (make-trans-node edit item nil nil)))
-                     this)))))
-  (doDelete [this edit item comp]
-    (cmp/with-compare comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
-        (cond
-         (= res  1) (do
-                      (when rnode
-                        (tref/set! r (.doDelete rnode edit item comp)))
-                      (throw+ {:not-found? true}))
-         (= res -1) (do
-                      (when lnode
-                        (tref/set! l (.doDelete lnode edit item comp)))
-                      (throw+ {:not-found? true}))
-         :else      (if (and lnode rnode)
-                      (let [^INode successor (loop [^INode node rnode]
-                                               (let [smaller (.left node)]
-                                                 (if smaller
-                                                   (recur smaller)
-                                                   node)))
-                            val (.value successor)]
-                        (if (identical? rnode successor)
-                          (make-trans-node edit val lnode (.right rnode))
-                          (make-trans-node edit val lnode (.doDelete rnode edit val comp))))
-                      (or lnode rnode))))))
-  (doInsertCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
-        (cond
-         (= res 0) (throw+ {:duplicate-key? true})
-         (= res 1) (if rnode
-                     (make-trans-node edit val lnode (.doInsertCopy rnode edit item comp))
-                     (make-trans-node edit val lnode (make-trans-node edit item)))
-                     
-         :else     (if lnode
-                     (make-trans-node edit val (.doInsertCopy lnode edit item comp) rnode)
-                     (make-trans-node edit val (make-trans-node edit item) rnode))))))
-  
-  (doDeleteCopy [this edit item comp]
-    (cmp/with-compare comp res item x
-      (let [^INode rnode @r
-            ^INode lnode @l]
-        (cond
-         (= res  1) (if rnode
-                      (make-trans-node edit val lnode (.doDeleteCopy rnode edit item comp))
-                      (throw+ {:not-found? true}))
-                      
-         (= res -1) (if lnode
-                      (make-trans-node edit val (.doDeleteCopy lnode edit item comp) rnode)
-                      (throw+ {:not-found? true}))
-                      
-         :else      (if (and lnode rnode)
-                      (let [^INode successor (loop [^INode node rnode]
-                                               (let [smaller (.left node)]
-                                                 (if smaller
-                                                   (recur smaller)
-                                                   node)))
-                            val (.value successor)]
-                        (if (identical? rnode successor)
-                          (make-trans-node edit val lnode (.right rnode))
-                          (make-trans-node edit val lnode (.doDeleteCopy rnode edit val comp))))
-                      (or lnode rnode))))))
-  
-  (retrieve [this item comp]
-    (let [^INode lnode @l
-          ^INode rnode @r]
-      (cmp/with-compare comp res item x
-        (cond
-         (= res 0)  x
-         (and (= res -1) lnode) (.retrieve lnode item comp)
-         (and (= res  1) rnode) (.retrieve rnode item comp)))))
-  (value [_] x)
-  (left [_] @l)
-  (right [_] @r))
+;;-- Creation Tests
 
-(defn make-leaf-node ^INode
-  [item]
-  (LeafNode. item))
+(defn- ^:static build-tree
+  "Returns a vector consisting of the tree and count of items"
+  [^Comparator comparator vals]
+  (when-let [coll (seq vals)]
+    (let [[x & xs] coll
+          root (LeafNode. x)
+          ins (fn [[^data.tree.bst.core.INode t c :as whole] v]
+                (try+
+                 [(insert t v comparator) (inc c)]
+                 (catch :duplicate-key? _
+                   whole)))
+          ]
+      (reduce ins [root 1] xs))))
 
-(defn make-lefty-node ^INode
-  [item ^INode left]
-  (LeftyNode. item left))
 
-(defn make-righty-node ^INode
-  [item ^INode right]
-  (RightyNode. item right))
+;;-- Pretty Printing
 
-(defn make-full-node ^INode
-  [item ^INode left ^INode right]
-  (FullNode. item left right))
-
-(defn make-trans-node ^INode
-  ^{:inline (fn [e i l r] `(TransNode. i
-                                      (tref/thread-bound-ref l e)
-                                      (tref/thread-bound-ref r e)))
-    :inline-arities #{4}}
-  [^EditContext edit item ^INode left ^INode right]
-  (TransNode. item (tref/thread-bound-ref left edit) (tref/thread-bound-ref right edit)))
-
-;;-- Printable Tree
 (extend-protocol PrintableTree
-  LeafNode   (print-tree [x] (prtree "LeafNode" (.value x)))
-  LeftyNode  (print-tree [x] (prtree "LeftyNode" (.value x) (.left x)))
-  RightyNode (print-tree [x] (prtree "RightyNode" (.value x) (.right x)))
-  FullNode   (print-tree [x] (prtree "FullNode" (.value x) (.left x) (.right x)))
-  TransNode  (print-tree [x] (prtree "TransNode" (.value x) (.left x) (.right x)))
-
-  )
+  LeafNode   (print-tree [x] (prtree "LeafNode" (:value x)))
+  LeftyNode  (print-tree [x] (prtree "LeftyNode" (:value x) (:left x)))
+  RightyNode (print-tree [x] (prtree "RightyNode" (:value x) (:right x)))
+  FullNode   (print-tree [x] (prtree "FullNode" (:value x) (:left x) (:right x))))

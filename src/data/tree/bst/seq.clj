@@ -2,20 +2,19 @@
       :author "Jeremy Bondeson"}
   data.tree.bst.seq
   (:use [data.seq :only [seq-equals seq-hash seq-count]])
-  (:require data.tree.bst.core)
+  (:use data.tree.bst.core)
   (:import (clojure.lang IObj Seqable Sequential ISeq
                          IPersistentCollection Counted Sorted
-                         IPersistentMap)
-           (data.tree.bst.core INode)))
+                         IPersistentMap)))
 
 (set! *warn-on-reflection* true)
 
 (defn- ^:static push-stack
-  [^INode node ^ISeq stack asc]
+  [^data.tree.bst.core.INode node ^ISeq stack asc]
   (let [f (if asc
-            (fn [^INode x] (.left x))
-            (fn [^INode x] (.right x)))]
-    (loop [^INode t node
+            (fn [^data.tree.bst.core.INode x] (left x))
+            (fn [^data.tree.bst.core.INode x] (right x)))]
+    (loop [^data.tree.bst.core.INode t node
            ^ISeq s stack]
       (if (nil? t)
         s
@@ -32,12 +31,12 @@
   Seqable
   (seq [this] this)
   ISeq
-  (first [_] (let [^INode node (first stack)]
-               (.value node)))
+  (first [_] (let [^data.tree.bst.core.INode node (first stack)]
+               (value node)))
   (more [this] (or (next this) (list)))
   (next [_] (let [f (if asc
-                      (fn [^INode x] (.right x))
-                      (fn [^INode x] (.left x)))
+                      (fn [^data.tree.bst.core.INode x] (right x))
+                      (fn [^data.tree.bst.core.INode x] (left x)))
                   t (first stack)
                   s (push-stack (f t) (next stack) asc)]
               (when (not (nil? s))
@@ -50,11 +49,11 @@
 
 (defn
   make-seq
-  ([^INode tree asc]
+  ([^data.tree.bst.core.INode tree asc]
      (Seq. nil (push-stack tree nil asc) asc nil (Object.)))
-  ([^INode tree asc cnt]
+  ([^data.tree.bst.core.INode tree asc cnt]
      (Seq. nil (push-stack tree nil asc) asc cnt (Object.)))
-  ([mdata ^INode tree asc cnt]
+  ([mdata ^data.tree.bst.core.INode tree asc cnt]
      (Seq. mdata (push-stack tree nil asc) asc cnt (Object.)))
-  ([mdata ^INode tree asc cnt id]
+  ([mdata ^data.tree.bst.core.INode tree asc cnt id]
      (Seq. mdata (push-stack tree nil asc) asc cnt id)))

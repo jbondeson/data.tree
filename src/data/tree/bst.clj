@@ -5,14 +5,16 @@
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
-  (:use [data.tree.bst.core :only [make-leaf-node]])
+  (:use [data.tree.bst.core])
   (:use [data.tree.bst.seq :only [make-seq]])
   (:use data.tree.printable)
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
-                         Reversible IEditableCollection)
+                         Reversible IEditableCollection
+                         IPersistentMap)
+           (java.util Comparator)
            (data.util EditContext)
-           (data.tree.bst.core INode)
+           (data.tree.bst.core LeafNode)
            (data.tree.bst.seq Seq)))
 
 (set! *warn-on-reflection* true)
@@ -21,8 +23,8 @@
 
 (declare make-bst)
 
-(deftype EmptyBinarySearchTree [^clojure.lang.IPersistentMap mdata
-                                ^java.util.Comparator comparator]
+(deftype EmptyBinarySearchTree [^IPersistentMap mdata
+                                ^Comparator comparator]
   Object
   (equals [_ x]
     (if (isa? (type x) EmptyBinarySearchTree)
@@ -42,7 +44,7 @@
   (count [_] 0)
   (empty [this] this)
   (equiv [this x] (.equals this x))
-  (cons [_ item] (make-bst mdata comparator (make-leaf-node item) 1))
+  (cons [_ item] (make-bst mdata comparator (LeafNode. item) 1))
   IPersistentSet
   (disjoin [this _] this)
   (contains [_ __] false)
@@ -54,10 +56,10 @@
   IEditableCollection
   (asTransient [this] nil))
 
-(deftype BinarySearchTree [^clojure.lang.IPersistentMap mdata
-                           ^java.util.Comparator comparator
-                           ^INode tree
-                           ^java.lang.Long count]
+(deftype BinarySearchTree [^IPersistentMap mdata
+                           ^Comparator comparator
+                           ^data.tree.bst.core.INode tree
+                           count]
   Object
   (equals [_ x]
     (if (isa? (type x) BinarySearchTree)
@@ -81,35 +83,35 @@
   (equiv [this x] (.equals this x))
   (cons [this item]
     (try+
-     (BinarySearchTree. mdata comparator (.insert tree item comparator) (inc count))
+     (BinarySearchTree. mdata comparator (insert tree item comparator) (inc count))
      (catch :duplicate-key? _
          this)))
   IPersistentSet
   (disjoin [this item]
     (try+
-     (let [ntree (.delete tree item comparator)]
+     (let [ntree (delete tree item comparator)]
        (if ntree
          (BinarySearchTree. mdata comparator ntree (dec count))
          (.empty this)))
      (catch :not-found? _
        this)))
   (contains [this x] (not (nil? (.get this x))))
-  (get [_ x] (.retrieve tree x comparator))
+  (get [_ x] (retrieve tree x comparator))
   Sorted
   (comparator [_] comparator)
   (entryKey [this x] (when (contains? this) x))
   (seqFrom [_ item asc]
-    (loop [^INode node tree
+    (loop [^data.tree.bst.core.INode node tree
            stack nil]
       (if (nil? node)
         (when stack (Seq. nil stack asc nil (Object.)))
-        (cmp/with-compare comparator res item (.value node)
+        (cmp/with-compare comparator res item (value node)
           (cond
            (= res  0)           (Seq. nil (cons node stack) asc nil (Object.))
-           (and asc (= res -1)) (recur (.left node) (cons node stack))
-           asc                  (recur (.right node) stack)
-           (= res 1)            (recur (.right node) (cons node stack))
-           :else                (recur (.left node) stack))))))
+           (and asc (= res -1)) (recur (left node) (cons node stack))
+           asc                  (recur (right node) stack)
+           (= res 1)            (recur (right node) (cons node stack))
+           :else                (recur (left node) stack))))))
   IEditableCollection
   (asTransient [this] nil))
 
@@ -120,13 +122,13 @@
 
 (defn- ^:static build-tree
   "Returns a vector consisting of the tree and count of items"
-  [^java.util.Comparator comparator vals]
+  [^Comparator comparator vals]
   (when-let [coll (seq vals)]
     (let [[x & xs] coll
-          root (make-leaf-node x)
-          ins (fn [[^INode t c :as whole] v]
+          root (LeafNode. x)
+          ins (fn [[^data.tree.bst.core.INode t c :as whole] v]
                 (try+
-                 [(.insert t v comparator) (inc c)]
+                 [(insert t v comparator) (inc c)]
                  (catch :duplicate-key? _
                    whole)))
           ]
@@ -142,14 +144,11 @@
 
 (defn ^:static binary-search-tree-by
   "Returns a new binary search tree with supplied keys, using the supplied comparator."
-  ([^java.util.Comparator comparator]
+  ([^Comparator comparator]
      (EmptyBinarySearchTree. nil comparator))
-  ([^java.util.Comparator comparator & keys]
+  ([^Comparator comparator & keys]
      (let [[tree count] (build-tree cmp/default keys)]
        (BinarySearchTree. nil comparator tree count))))
-
-;;-- Transient Binary Search Tree
-
 
 ;;-- Pretty Printing
 

@@ -5,28 +5,27 @@
   (:require [clojurecheck.core :as cc])
   (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
-  (:require data.tree.bst.core)
-  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)
-           (data.tree.bst.core INode)))
+  (:use data.tree.bst.core)
+  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)))
 
 ;; Bring in some private methods from data.tree.bst
 (def ^:private build
   (ns-resolve 'data.tree.bst 'build-tree)) 
 
-(def ^:private make-trans-node
+#_(def ^:private make-trans-node
   (ns-resolve 'data.tree.bst.core 'make-trans-node))
 
 (defn build-def
   [& args]
   (build cmp/default args))
 
-(defn build-trans-def
+#_(defn build-trans-def
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
           edit (tref/edit-context)
           root (make-trans-node edit x nil nil)
-          ins (fn [[^INode t cnt] v]
+          ins (fn [[^data.tree.bst.core.INode t cnt] v]
                 [(.doInsert t edit v cmp/default) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
@@ -53,11 +52,11 @@
 (def bsts
   (mmap (partial apply binary-search-tree) test-trees))
 
-(defn make-transients
+#_(defn make-transients
   []
   (mmap (fn [v] (first (apply build-trans-def v))) test-trees))
 
-(def transients
+#_(def transients
   (make-transients))
 
 (declare identical-structure? ins-def del-def ret-def
@@ -175,72 +174,72 @@
           :l-full    79  nil
           :l-full    19  nil)))
 
-(insertion-tests transient-doinsert doins-def identity (make-transients))
-(insertion-tests transient-insert   ins-def   identity transients)
+#_(insertion-tests transient-doinsert doins-def identity (make-transients))
+#_(insertion-tests transient-insert   ins-def   identity transients)
 (insertion-tests persistent-insert  ins-def   identity trees)
 (insertion-tests bst-insert         conj      .tree    bsts)
 
-(deletion-tests transient-dodelete dodel-def identity (make-transients))
-(deletion-tests transient-delete   del-def   identity transients)
+#_(deletion-tests transient-dodelete dodel-def identity (make-transients))
+#_(deletion-tests transient-delete   del-def   identity transients)
 (deletion-tests persistent-delete  del-def   identity trees)
 (deletion-tests bst-delete         disj      #(if (isa? (type %) EmptyBinarySearchTree)
                                                 nil
                                                 (.tree %))    bsts)
 
-(retrieval-tests transient-retrieve  ret-def transients)
+#_(retrieval-tests transient-retrieve  ret-def transients)
 (retrieval-tests persistent-retrieve ret-def trees)
 (retrieval-tests bst-retrieve        get     bsts)
 
 ;;==== Helper Functions ====
 
 ;; Alias node functions to take the default comparator
-(defn ins-def [^INode tree item]
+(defn ins-def [^data.tree.bst.core.INode tree item]
   (try+
-   (.insert tree item cmp/default)
+   (insert tree item cmp/default)
    (catch :duplicate-key? _
      tree)))
-(defn del-def [^INode tree item]
+(defn del-def [^data.tree.bst.core.INode tree item]
   (try+
-   (.delete tree item cmp/default)
+   (delete tree item cmp/default)
    (catch :not-found? _
      tree)))
-(defn ret-def [^INode tree item]
-  (.retrieve tree item cmp/default))
-(defn doins-def [^INode tree item]
+(defn ret-def [^data.tree.bst.core.INode tree item]
+  (retrieve tree item cmp/default))
+#_(defn doins-def [^data.tree.bst.core.INode tree item]
   (try+
    (.doInsert tree (tref/edit-context) item cmp/default)
    (catch :duplicate-key? _
      tree)))
-(defn dodel-def [^INode tree item]
+#_(defn dodel-def [^data.tree.bst.core.INode tree item]
   (try+
    (.doDelete tree (tref/edit-context) item cmp/default)
    (catch :not-found? _
      tree)))
 
-(defn flatten-tree [^INode tree]
+(defn flatten-tree [^data.tree.bst.core.INode tree]
   (loop [res '[]
          node tree
          queue '()]
     (cond
      (and (nil? node) (empty? queue)) res
      (nil? node) (recur res (first queue) (rest queue))
-     :else (recur (conj res (.value node))
-                  (.left node)
-                  (cons (.right node) queue)))))
+     :else (recur (conj res (value node))
+                  (left node)
+                  (cons (right node) queue)))))
 
-(defn tree-structure [^INode tree]
+(defn tree-structure [^data.tree.bst.core.INode tree]
   (when tree
-    (let [l (.left tree)
-          r (.right tree)
-          v (.value tree)]
+    (let [l (left tree)
+          r (right tree)
+          v (value tree)]
       (if (and (nil? l) (nil? r))
         v
         (list v (tree-structure l) (tree-structure r))))))
 
-(defn identical-traversal? [^INode tree coll]
+(defn identical-traversal? [^data.tree.bst.core.INode tree coll]
   (= (flatten-tree tree) coll))
 
-(defn identical-structure? [^INode tree structure]
+(defn identical-structure? [^data.tree.bst.core.INode tree structure]
   (= (tree-structure tree) structure))
 
 (defn- make-queue
