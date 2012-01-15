@@ -5,16 +5,16 @@
   (:require [clojurecheck.core :as cc])
   (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
-  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
-                          INode 
-                          )))
+  (:require data.tree.bst.core)
+  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)
+           (data.tree.bst.core INode)))
 
 ;; Bring in some private methods from data.tree.bst
 (def ^:private build
   (ns-resolve 'data.tree.bst 'build-tree)) 
 
 (def ^:private make-trans-node
-  (ns-resolve 'data.tree.bst 'make-trans-node))
+  (ns-resolve 'data.tree.bst.core 'make-trans-node))
 
 (defn build-def
   [& args]

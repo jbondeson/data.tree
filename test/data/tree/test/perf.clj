@@ -1,12 +1,9 @@
 (ns data.tree.test.perf
   (:use [data.tree.bst])
+  (:use [data.tree.bst.core])
   (:use [data.tree.test.bst])
   (:use [clojure.test])
-  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree
-                          LeafNode LeftyNode RightyNode FullNode
-                          TransNode
-                          INode 
-                          )))
+  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)))
 
 ;; Tree Ops
 (defn tree-trans-time []
