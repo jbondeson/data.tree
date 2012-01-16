@@ -175,12 +175,14 @@
           :l-full    79  nil
           :l-full    19  nil)))
 
+(insertion-tests trans-copy-insert! ins!-def identity transients)
 (insertion-tests transient-insert!  ins!-def identity (make-transients))
 (insertion-tests transient-insert   ins-def  identity transients)
 (insertion-tests persistent-insert  ins-def  identity trees)
 (insertion-tests persistent-insert! ins!-def identity trees)
 (insertion-tests bst-insert         conj     get-head bsts)
 
+(deletion-tests trans-copy-delete! del!-def identity transients)
 (deletion-tests transient-delete!  del!-def identity (make-transients))
 (deletion-tests transient-delete   del-def  identity transients)
 (deletion-tests persistent-delete  del-def  identity trees)

@@ -249,28 +249,32 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-insert!
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (cmp/with-compare comp res item (:value node)
-    (let [^ThreadBoundRef l (:left node)
-          ^ThreadBoundRef r (:right node)
-          ^data.tree.bst.core.INode lnode @l
-          ^data.tree.bst.core.INode rnode @r]
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (do
-                   (if rnode
-                     (tref/set! r (insert! rnode edit item comp))
-                     (tref/set! r (make-trans-node edit item nil nil)))
-                   node)
-       :else     (do
-                   (if lnode
-                     (tref/set! l  (insert! lnode edit item comp))
-                     (tref/set! l (make-trans-node edit item nil nil)))
-                   node)))))
+  (if (not (tref/editable? (:left node)))
+    (insert+copy node edit item comp)
+    (cmp/with-compare comp res item (:value node)
+      (let [^ThreadBoundRef l (:left node)
+            ^ThreadBoundRef r (:right node)
+            ^data.tree.bst.core.INode lnode @l
+            ^data.tree.bst.core.INode rnode @r]
+        (cond
+         (= res 0) (throw+ {:duplicate-key? true})
+         (= res 1) (do
+                     (if rnode
+                       (tref/set! r (insert! rnode edit item comp))
+                       (tref/set! r (make-trans-node edit item nil nil)))
+                     node)
+         :else     (do
+                     (if lnode
+                       (tref/set! l  (insert! lnode edit item comp))
+                       (tref/set! l (make-trans-node edit item nil nil)))
+                     node))))))
 
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-delete!
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (cmp/with-compare comp res item (:value node)
+  (if (not (tref/editable? (:left node)))
+    (delete+copy node edit item comp)
+    (cmp/with-compare comp res item (:value node)
       (let [^ThreadBoundRef l (:left node)
             ^ThreadBoundRef r (:right node)
             ^data.tree.bst.core.INode lnode @l
@@ -295,7 +299,7 @@
                         (if (identical? rnode successor)
                           (make-trans-node edit nval lnode (right rnode))
                           (make-trans-node edit nval lnode (delete! rnode edit val comp))))
-                      (or lnode rnode))))))
+                      (or lnode rnode)))))))
 
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-insert+copy
