@@ -33,13 +33,6 @@
     :inline-arities #{4}}
   make-trans-node
   [^EditContext edit value left right]
-
-(extend FullNode
-  ITransientNode
-  {:insert! full-insert+copy
-   :delete! full-delete+copy
-   :insert+copy full-insert+copy
-   :delete+copy full-delete+copy})
   (TransientNode. value
                  (tref/thread-bound-ref left edit)
                  (tref/thread-bound-ref right edit)))
