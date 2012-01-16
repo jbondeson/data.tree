@@ -13,7 +13,7 @@ public class EditContext {
         this._ctx = ctx;
     }
 
-    public void persist() {
+    public void persistent() {
         this._ctx.set(null);
     }
 

@@ -1,7 +1,8 @@
 (ns ^{:doc "Reference object to data structures"
       :author "Jeremy Bondeson"}
-    data.util.tref
-    (:import (data.util ThreadBoundRef EditContext)))
+  data.util.tref
+  (:refer-clojure :exclude [persistent!])
+  (:import (data.util ThreadBoundRef EditContext)))
 
 (set! *warn-on-reflection* true)
 
@@ -11,9 +12,9 @@
   []
   (EditContext.))
 
-(defn persist!
+(defn persistent!
   [^EditContext edit]
-  (.persist edit))
+  (.persistent edit))
 
 (defn thread-bound-ref ^ThreadBoundRef
   ^{:inline (fn [v e] `(ThreadBoundRef. v e))
@@ -29,6 +30,17 @@
   [^ThreadBoundRef ref value]
   (.set ref value))
 
+
+(defn ensure-editable
+  [ref-or-edit]
+    (let [type (type ref-or-edit)]
+    (cond
+     (isa? type EditContext)    (.ensureEditable ^EditContext ref-or-edit)
+     (isa? type ThreadBoundRef) (.ensureEditable ^ThreadBoundRef ref-or-edit))))
+
 (defn editable?
-  [^ThreadBoundRef ref]
-  (.isEditable ref))
+  [ref-or-edit]
+  (let [type (type ref-or-edit)]
+    (cond
+     (isa? type EditContext)    (.isEditable ^EditContext ref-or-edit)
+     (isa? type ThreadBoundRef) (.isEditable ^ThreadBoundRef ref-or-edit))))

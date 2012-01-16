@@ -20,9 +20,13 @@ public class ThreadBoundRef implements IDeref {
     }
 
     public Object set(Object val) {
-        this._edit.ensureEditable();
+        this.ensureEditable();
         this._val = val;
         return this._val;
+    }
+
+    public void ensureEditable() {
+        this._edit.ensureEditable();
     }
 
     public boolean isEditable() {
