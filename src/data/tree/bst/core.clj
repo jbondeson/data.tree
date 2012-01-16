@@ -27,7 +27,6 @@
 (defn- ^:static const-nil [_] nil)
 
 ;;-- Leaf Node Implementation
-
 (defn- ^data.tree.bst.core.INode
   leaf-insert
   [^LeafNode node item ^Comparator comp]
