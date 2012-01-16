@@ -5,6 +5,7 @@
   (:require [clojurecheck.core :as cc])
   (:require [data.compare :as cmp])
   (:require [data.util.tref :as tref])
+  (:use [data.tree.bst.transient])
   (:use data.tree.bst.core)
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)))
 
@@ -12,21 +13,21 @@
 (def ^:private build
   (ns-resolve 'data.tree.bst 'build-tree)) 
 
-#_(def ^:private make-trans-node
-  (ns-resolve 'data.tree.bst.core 'make-trans-node))
+(def ^:private make-trans-node
+  (ns-resolve 'data.tree.bst.transient 'make-trans-node))
 
 (defn build-def
   [& args]
   (build cmp/default args))
 
-#_(defn build-trans-def
+(defn build-trans-def
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
           edit (tref/edit-context)
           root (make-trans-node edit x nil nil)
           ins (fn [[^data.tree.bst.core.INode t cnt] v]
-                [(.doInsert t edit v cmp/default) (inc cnt)])]
+                [(insert! t edit v cmp/default) (inc cnt)])]
       (dosync
        (reduce ins [root 1] xs)))))
 
@@ -52,15 +53,15 @@
 (def bsts
   (mmap (partial apply binary-search-tree) test-trees))
 
-#_(defn make-transients
+(defn make-transients
   []
   (mmap (fn [v] (first (apply build-trans-def v))) test-trees))
 
-#_(def transients
+(def transients
   (make-transients))
 
 (declare identical-structure? ins-def del-def ret-def
-         doins-def dodel-def)
+         ins!-def del!-def get-head)
 
 ;; Empty Tests
 (deftest one-empty-bst
@@ -174,23 +175,29 @@
           :l-full    79  nil
           :l-full    19  nil)))
 
-#_(insertion-tests transient-doinsert doins-def identity (make-transients))
-#_(insertion-tests transient-insert   ins-def   identity transients)
-(insertion-tests persistent-insert  ins-def   identity trees)
-(insertion-tests bst-insert         conj      .tree    bsts)
+(insertion-tests transient-insert!  ins!-def identity (make-transients))
+(insertion-tests transient-insert   ins-def  identity transients)
+(insertion-tests persistent-insert  ins-def  identity trees)
+(insertion-tests persistent-insert! ins!-def identity trees)
+(insertion-tests bst-insert         conj     get-head bsts)
 
-#_(deletion-tests transient-dodelete dodel-def identity (make-transients))
-#_(deletion-tests transient-delete   del-def   identity transients)
-(deletion-tests persistent-delete  del-def   identity trees)
-(deletion-tests bst-delete         disj      #(if (isa? (type %) EmptyBinarySearchTree)
-                                                nil
-                                                (.tree %))    bsts)
+(deletion-tests transient-delete!  del!-def identity (make-transients))
+(deletion-tests transient-delete   del-def  identity transients)
+(deletion-tests persistent-delete  del-def  identity trees)
+(deletion-tests persistent-delete! del!-def identity trees)
+(deletion-tests bst-delete         disj     get-head bsts)
 
-#_(retrieval-tests transient-retrieve  ret-def transients)
+(retrieval-tests transient-retrieve  ret-def transients)
 (retrieval-tests persistent-retrieve ret-def trees)
 (retrieval-tests bst-retrieve        get     bsts)
 
 ;;==== Helper Functions ====
+(defn get-head
+  [tree]
+  (cond
+   (isa? (type tree) EmptyBinarySearchTree) nil
+   (isa? (type tree) BinarySearchTree)      (.tree tree)
+   :else                                    tree))
 
 ;; Alias node functions to take the default comparator
 (defn ins-def [^data.tree.bst.core.INode tree item]
@@ -205,14 +212,14 @@
      tree)))
 (defn ret-def [^data.tree.bst.core.INode tree item]
   (retrieve tree item cmp/default))
-#_(defn doins-def [^data.tree.bst.core.INode tree item]
+(defn ins!-def [^data.tree.bst.core.INode tree item]
   (try+
-   (.doInsert tree (tref/edit-context) item cmp/default)
+   (insert! tree (tref/edit-context) item cmp/default)
    (catch :duplicate-key? _
      tree)))
-#_(defn dodel-def [^data.tree.bst.core.INode tree item]
+(defn del!-def [^data.tree.bst.core.INode tree item]
   (try+
-   (.doDelete tree (tref/edit-context) item cmp/default)
+   (delete! tree (tref/edit-context) item cmp/default)
    (catch :not-found? _
      tree)))
 

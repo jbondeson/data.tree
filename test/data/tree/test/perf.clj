@@ -6,7 +6,7 @@
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)))
 
 ;; Tree Ops
-#_(defn tree-trans-time []
+(defn tree-trans-time []
   (let [coll (balanced-seq 10000)] 
     (time (do (doall (apply build-trans-def coll)) nil))))
 

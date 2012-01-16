@@ -17,5 +17,5 @@
   (print ">"))
 
 (extend-protocol PrintableTree
-  Object (print-tree [x] (prtree x))
+  Object (print-tree [x] (pr x))
   nil    (print-tree [x] (print "nil")))
