@@ -9,7 +9,9 @@
   (:require [data.util.tref :as tref])
   (:import (java.util Comparator)
            (data.util EditContext ThreadBoundRef)
-           (data.tree.bst.core LeafNode LeftyNode RightyNode FullNode)))
+           (data.tree.bst.core LeafNode LeftyNode RightyNode FullNode)
+           (clojure.lang IEditableCollection Counted IPersistentMap
+                         ITransientCollection ITransientSet)))
 
 (set! *warn-on-reflection* true)
 
@@ -351,6 +353,58 @@
    :insert+copy trans-insert+copy
    :delete+copy trans-delete+copy})
 
+;;-- Transient Tree Implementation
+
+;; This will avoid a circular dependency, because the three types all
+;;  reference each other, short of throwing everything in one file,
+;;  this is the only way to resolve that
+(def ^:private make-bst
+  (ns-resolve 'data.tree.bst 'make-bst))
+
+(deftype TransientBinarySearchTree [^IPersistentMap mdata
+                                    ^Comparator comparator
+                                    ^EditContext edit
+                                    ^ThreadBoundRef tree
+                                    ^ThreadBoundRef count]
+  Counted
+  (count [this] @count)
+  ITransientCollection
+  (persistent [_] (do
+                    (tref/ensure-editable edit)
+                    (tref/persistent! edit)
+                    (if-let [head @tree]
+                      (make-bst mdata comparator head @count)
+                      (make-bst mdata comparator))))
+  (conj [this item] (try+
+                     (tref/set! tree
+                                (if-let [head @tree]
+                                  (insert! head edit item comparator)
+                                  (make-trans-node edit item nil nil)))
+                     (tref/set! count (inc @count))
+                     this
+                     (catch :duplicate-key? _
+                       this)))
+  ITransientSet
+  (disjoin [this item] (try+
+                        (when-let [head @tree]
+                          (tref/set! tree (delete! head edit item comparator))
+                          (tref/set! count (dec @count)))
+                        this
+                        (catch :not-found? _
+                          this)))
+  (contains [this item] (not (nil? (.get this item))))
+  (get [this item] (when-let [head @tree]
+                     (retrieve head item comparator)))
+  )
+
+(defn transient-bst
+  [^IPersistentMap mdata ^Comparator comparator ^data.tree.bst.core.INode tree count]
+  (let [edit (EditContext.)]
+    (TransientBinarySearchTree. mdata comparator edit
+                                (tref/thread-bound-ref tree)
+                                (tref/thread-bound-ref count))))
+
 ;;-- Printable Tree
 (extend-protocol PrintableTree
-  TransientNode (print-tree [x] (prtree "TransNode" (:value x) @(:left x) @(:right x))))
+  TransientNode (print-tree [x] (prtree "TransNode" (:value x) @(:left x) @(:right x)))
+  TransientBinarySearchTree (print-tree [x] (prtree "TransBST :" (count x) @(.tree x))))

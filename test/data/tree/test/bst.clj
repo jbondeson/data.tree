@@ -7,7 +7,8 @@
   (:require [data.util.tref :as tref])
   (:use [data.tree.bst.transient])
   (:use data.tree.bst.core)
-  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)))
+  (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)
+           (data.tree.bst.transient TransientBinarySearchTree)))
 
 ;; Bring in some private methods from data.tree.bst
 (def ^:private build
@@ -28,8 +29,18 @@
           root (make-trans-node edit x nil nil)
           ins (fn [[^data.tree.bst.core.INode t cnt] v]
                 [(insert! t edit v cmp/default) (inc cnt)])]
-      (dosync
-       (reduce ins [root 1] xs)))))
+      (reduce ins [root 1] xs))))
+
+(defn build-trans-tree-def
+  [& args]
+  (when-let [coll (seq args)]
+    (let [[x & xs] coll
+          tree (conj!
+                (transient (EmptyBinarySearchTree. nil cmp/default))
+                x)
+          ins (fn [[t cnt] v]
+                [(conj! t v) (inc cnt)])]
+      (reduce ins [tree 1] xs))))
 
 (def test-trees
   {:leaf        '(50)
@@ -57,8 +68,15 @@
   []
   (mmap (fn [v] (first (apply build-trans-def v))) test-trees))
 
+(defn make-transient-trees
+  []
+  (mmap (fn [v] (first (apply build-trans-tree-def v))) test-trees))
+
 (def transients
   (make-transients))
+
+(def transient-trees
+  (make-transient-trees))
 
 (declare identical-structure? ins-def del-def ret-def
          ins!-def del!-def get-head)
@@ -181,6 +199,7 @@
 (insertion-tests persistent-insert  ins-def  identity trees)
 (insertion-tests persistent-insert! ins!-def identity trees)
 (insertion-tests bst-insert         conj     get-head bsts)
+(insertion-tests trans-bst-insert   conj!    get-head (make-transient-trees))
 
 (deletion-tests trans-copy-delete! del!-def identity transients)
 (deletion-tests transient-delete!  del!-def identity (make-transients))
@@ -196,10 +215,12 @@
 ;;==== Helper Functions ====
 (defn get-head
   [tree]
-  (cond
-   (isa? (type tree) EmptyBinarySearchTree) nil
-   (isa? (type tree) BinarySearchTree)      (.tree tree)
-   :else                                    tree))
+  (let [type (type tree)]
+    (cond
+     (isa? type EmptyBinarySearchTree)     nil
+     (isa? type BinarySearchTree)          (.tree tree)
+     (isa? type TransientBinarySearchTree) @(.tree tree)
+     :else                                 tree)))
 
 ;; Alias node functions to take the default comparator
 (defn ins-def [^data.tree.bst.core.INode tree item]

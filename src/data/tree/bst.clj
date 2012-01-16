@@ -7,6 +7,7 @@
   (:require [data.util.tref :as tref])
   (:use [data.tree.bst.core])
   (:use [data.tree.bst.seq :only [make-seq]])
+  (:use [data.tree.bst.transient :only [transient-bst]])
   (:use data.tree.printable)
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
@@ -54,7 +55,7 @@
   (entryKey [_ __] nil)
   (seqFrom [_ __ ___] nil)
   IEditableCollection
-  (asTransient [this] nil))
+  (asTransient [this] (transient-bst mdata comparator nil 0)))
 
 (deftype BinarySearchTree [^IPersistentMap mdata
                            ^Comparator comparator
@@ -113,12 +114,15 @@
            (= res 1)            (recur (right node) (cons node stack))
            :else                (recur (left node) stack))))))
   IEditableCollection
-  (asTransient [this] nil))
+  (asTransient [this] (transient-bst mdata comparator tree count)))
 
 
 
-(defn- make-bst [mdata comparator tree count]
-  (BinarySearchTree. mdata comparator tree count))
+(defn- make-bst
+  ([mdata comparator]
+     (EmptyBinarySearchTree. mdata comparator))
+  ([mdata comparator tree count]
+     (BinarySearchTree. mdata comparator tree count)))
 
 (defn- ^:static build-tree
   "Returns a vector consisting of the tree and count of items"
