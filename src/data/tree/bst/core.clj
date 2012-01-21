@@ -19,10 +19,10 @@
     right [this])
   (value [this]))
 
-(defrecord LeafNode [value])
-(defrecord LeftyNode [value ^data.tree.bst.core.INode left])
-(defrecord RightyNode [value ^data.tree.bst.core.INode right])
-(defrecord FullNode [value ^data.tree.bst.core.INode left ^data.tree.bst.core.INode right])
+(deftype LeafNode [value])
+(deftype LeftyNode [value ^data.tree.bst.core.INode left])
+(deftype RightyNode [value ^data.tree.bst.core.INode right])
+(deftype FullNode [value ^data.tree.bst.core.INode left ^data.tree.bst.core.INode right])
 
 (defn- ^:static const-nil [_] nil)
 
@@ -30,7 +30,7 @@
 (defn- ^data.tree.bst.core.INode
   leaf-insert
   [^LeafNode node item ^Comparator comp]
-  (let [val (:value node)
+  (let [val (.value node)
         leaf (LeafNode. item)]
     (cmp/with-compare comp res item val
       (cond
@@ -41,16 +41,16 @@
 (defn- ^data.tree.bst.core.INode
   leaf-delete
   [^LeafNode node item ^Comparator comp]
-  (cmp/with-compare comp res item (:value node)
+  (cmp/with-compare comp res item (.value node)
     (when (not (= res 0))
       (throw+ {:not-found? true}))))
 
 (defn- 
   leaf-retrieve
   [^LeafNode node item ^Comparator comp]
-  (cmp/with-compare comp res item (:value node)
+  (cmp/with-compare comp res item (.value node)
     (when  (= res 0)
-      (:value node))))
+      (.value node))))
 
 (extend LeafNode
   INode
@@ -59,15 +59,15 @@
    :retrieve leaf-retrieve
    :left const-nil
    :right const-nil
-   :value :value})
+   :value (fn [^LeafNode x] (.value x))})
 
 ;;-- Lefty Node Implementation
 
 (defn- 
   ^data.tree.bst.core.INode lefty-insert
   [^LeftyNode node item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)]
+  (let [val (.value node)
+        l   (.left node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
@@ -77,11 +77,11 @@
 (defn- 
   ^data.tree.bst.core.INode lefty-delete
   [^LeftyNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
-       (= res 0)  (:left node)
-       (= res -1) (let [nnode (delete (:left node) item comp)]
+       (= res 0)  (.left node)
+       (= res -1) (let [nnode (delete (.left node) item comp)]
                     (if nnode
                       (LeftyNode. val nnode)
                       (LeafNode. val)))
@@ -90,40 +90,40 @@
 (defn- 
   lefty-retrieve
   [^LeftyNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  val
-       (= res -1) (retrieve (:left node) item comp)))))
+       (= res -1) (retrieve (.left node) item comp)))))
 
 (extend LeftyNode
   INode
   {:insert lefty-insert
    :delete lefty-delete
    :retrieve lefty-retrieve
-   :left :left
+   :left (fn [^LeftyNode x] (.left x))
    :right const-nil
-   :value :value})
+   :value (fn [^LeftyNode x] (.value x))})
 
 ;;-- Righty Node Implementation
 (defn- ^data.tree.bst.core.INode
   righty-insert
   [^RightyNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (RightyNode. val (insert (:right node) item comp))
-       :else     (FullNode. val (LeafNode. item) (:right node))))))
+       (= res 1) (RightyNode. val (insert (.right node) item comp))
+       :else     (FullNode. val (LeafNode. item) (.right node))))))
 
 (defn- ^data.tree.bst.core.INode
   righty-delete
   [^RightyNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
-       (= res 0) (:right node)
-       (= res 1) (let [nnode (delete (:right node) item comp)]
+       (= res 0) (.right node)
+       (= res 1) (let [nnode (delete (.right node) item comp)]
                    (if nnode
                      (RightyNode. val nnode)
                      (LeafNode. val)))
@@ -132,11 +132,11 @@
 (defn-
   righty-retrieve
   [^RightyNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  val
-       (= res 1) (retrieve (:right node) item comp)))))
+       (= res 1) (retrieve (.right node) item comp)))))
 
 (extend RightyNode
   INode
@@ -144,27 +144,27 @@
    :delete righty-delete
    :retrieve righty-retrieve
    :left const-nil
-   :right :right
-   :value :value})
+   :right (fn [x] (.right x))
+   :value (fn [x] (.value x))})
 
 ;;-- Full Node Implementation
 
 (defn- ^data.tree.bst.core.INode
   full-insert
   [^FullNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (FullNode. val (:left node) (insert (:right node) item comp))
-       :else     (FullNode. val (insert (:left node) item comp) (:right node))))))
+       (= res 1) (FullNode. val (.left node) (insert (.right node) item comp))
+       :else     (FullNode. val (insert (.left node) item comp) (.right node))))))
 
 (defn- ^data.tree.bst.core.INode
   full-delete
   [^FullNode node item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)
-        r   (:right node)]
+  (let [val (.value node)
+        l   (.left node)
+        r   (.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res  1) (let [rnode (delete r item comp)]
@@ -191,21 +191,21 @@
 (defn-
   full-retrieve
   [^FullNode node item ^Comparator comp]
-  (let [val (:value node)]
+  (let [val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  val
-       (= res 1) (retrieve (:right node) item comp)
-       :else     (retrieve (:left node) item comp)))))
+       (= res 1) (retrieve (.right node) item comp)
+       :else     (retrieve (.left node) item comp)))))
 
 (extend FullNode
   INode
   {:insert full-insert
    :delete full-delete
    :retrieve full-retrieve
-   :left :left
-   :right :right
-   :value :value})
+   :left (fn [^FullNode x] (.left x))
+   :right (fn [^FullNode x] (.right x))
+   :value (fn [^FullNode x] (.value x))})
 
 ;;-- Creation Tests
 
@@ -227,7 +227,7 @@
 ;;-- Pretty Printing
 
 (extend-protocol PrintableTree
-  LeafNode   (print-tree [x] (prtree "LeafNode" (:value x)))
-  LeftyNode  (print-tree [x] (prtree "LeftyNode" (:value x) (:left x)))
-  RightyNode (print-tree [x] (prtree "RightyNode" (:value x) (:right x)))
-  FullNode   (print-tree [x] (prtree "FullNode" (:value x) (:left x) (:right x))))
+  LeafNode   (print-tree [x] (prtree "LeafNode" (.value x)))
+  LeftyNode  (print-tree [x] (prtree "LeftyNode" (.value x) (.left x)))
+  RightyNode (print-tree [x] (prtree "RightyNode" (.value x) (.right x)))
+  FullNode   (print-tree [x] (prtree "FullNode" (.value x) (.left x) (.right x))))

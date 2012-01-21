@@ -25,7 +25,7 @@
   (^data.tree.bst.transient.ITransientNode
     delete+copy [this ^EditContext edit item ^Comparator comp]))
 
-(defrecord TransientNode [value ^ThreadBoundRef left ^ThreadBoundRef right])
+(deftype TransientNode [value ^ThreadBoundRef left ^ThreadBoundRef right])
 
 (defn-
   ^{:tag data.tree.bst.transient.ITransientNode
@@ -44,7 +44,7 @@
   leaf-insert+copy
   [^LeafNode node ^EditContext edit item ^Comparator comp]
   (let [leaf (make-trans-node edit item nil nil)
-        val (:value node)]
+        val (.value node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
@@ -54,7 +54,7 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   leaf-delete+copy
   [^LeafNode node ^EditContext edit item ^Comparator comp]
-  (cmp/with-compare comp res item (:value node)
+  (cmp/with-compare comp res item (.value node)
     (when (not (= res 0))
       (throw+ {:not-found? true}))))
 
@@ -69,8 +69,8 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   lefty-insert+copy
   [^LeftyNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)]
+  (let [val (.value node)
+        l   (.left node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  (throw+ {:duplicate-key? true})
@@ -80,8 +80,8 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   lefty-delete+copy
   [^LeftyNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)]
+  (let [val (.value node)
+        l   (.left node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  l
@@ -99,8 +99,8 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   righty-insert+copy
   [^RightyNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        r   (:right node)]
+  (let [val (.value node)
+        r   (.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
@@ -110,8 +110,8 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   righty-delete+copy
   [^RightyNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        r   (:right node)]
+  (let [val (.value node)
+        r   (.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) r
@@ -129,9 +129,9 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   full-insert+copy
   [^FullNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)
-        r   (:right node)]
+  (let [val (.value node)
+        l   (.left node)
+        r   (.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
@@ -141,9 +141,9 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   full-delete+copy
   [^FullNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        l   (:left node)
-        r   (:right node)]
+  (let [val (.value node)
+        l   (.left node)
+        r   (.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res  1) (make-trans-node edit val l (delete+copy r edit item comp))    
@@ -170,9 +170,9 @@
 (defn- ^data.tree.bst.core.INode
   trans-insert
   [^TransientNode node item ^Comparator comp]
-  (let [val (:value node)
-        ^data.tree.bst.core.INode l @(:left node)
-        ^data.tree.bst.core.INode r @(:right node)]
+  (let [val (.value node)
+        ^data.tree.bst.core.INode l @(.left node)
+        ^data.tree.bst.core.INode r @(.right node)]
     (cmp/with-compare comp res item val
         (cond
          (= res 0) (throw+ {:duplicate-key? true})
@@ -190,9 +190,9 @@
 (defn- ^data.tree.bst.core.INode
   trans-delete
   [^TransientNode node item ^Comparator comp]
-  (let [val (:value node)
-        ^data.tree.bst.core.INode l @(:left node)
-        ^data.tree.bst.core.INode r @(:right node)]
+  (let [val (.value node)
+        ^data.tree.bst.core.INode l @(.left node)
+        ^data.tree.bst.core.INode r @(.right node)]
     (cmp/with-compare comp res item val
         (cond
          (= res -1) (if l
@@ -229,9 +229,9 @@
 (defn- ^data.tree.bst.core.INode
   trans-retrieve
   [^TransientNode node item ^Comparator comp]
-  (let [val (:value node)
-        ^data.tree.bst.core.INode l @(:left node)
-        ^data.tree.bst.core.INode r @(:right node)]
+  (let [val (.value node)
+        ^data.tree.bst.core.INode l @(.left node)
+        ^data.tree.bst.core.INode r @(.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0)  val
@@ -243,19 +243,19 @@
   {:insert trans-insert
    :delete trans-delete
    :retrieve trans-retrieve
-   :left (fn [x] @(:left x))
-   :right (fn [x] @(:right x))
-   :value :value})
+   :left (fn [^TransientNode x] @(.left x))
+   :right (fn [^TransientNode x] @(.right x))
+   :value (fn [^TransientNode x] (.value x))})
 
 ;;-- Transient Node ITransientNode Implementation
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-insert!
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (if (not (tref/editable? (:left node)))
+  (if (not (tref/editable? (.left node)))
     (insert+copy node edit item comp)
-    (cmp/with-compare comp res item (:value node)
-      (let [^ThreadBoundRef l (:left node)
-            ^ThreadBoundRef r (:right node)
+    (cmp/with-compare comp res item (.value node)
+      (let [^ThreadBoundRef l (.left node)
+            ^ThreadBoundRef r (.right node)
             ^data.tree.bst.core.INode lnode @l
             ^data.tree.bst.core.INode rnode @r]
         (cond
@@ -274,11 +274,11 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-delete!
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (if (not (tref/editable? (:left node)))
+  (if (not (tref/editable? (.left node)))
     (delete+copy node edit item comp)
-    (cmp/with-compare comp res item (:value node)
-      (let [^ThreadBoundRef l (:left node)
-            ^ThreadBoundRef r (:right node)
+    (cmp/with-compare comp res item (.value node)
+      (let [^ThreadBoundRef l (.left node)
+            ^ThreadBoundRef r (.right node)
             ^data.tree.bst.core.INode lnode @l
             ^data.tree.bst.core.INode rnode @r]
         (cond
@@ -306,9 +306,9 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-insert+copy
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        ^data.tree.bst.core.INode l @(:left node)
-        ^data.tree.bst.core.INode r @(:right node)]
+  (let [val (.value node)
+        ^data.tree.bst.core.INode l @(.left node)
+        ^data.tree.bst.core.INode r @(.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res 0) (throw+ {:duplicate-key? true})
@@ -322,9 +322,9 @@
 (defn- ^data.tree.bst.transient.ITransientNode
   trans-delete+copy
   [^TransientNode node ^EditContext edit item ^Comparator comp]
-  (let [val (:value node)
-        ^data.tree.bst.core.INode l @(:left node)
-        ^data.tree.bst.core.INode r @(:right node)]
+  (let [val (.value node)
+        ^data.tree.bst.core.INode l @(.left node)
+        ^data.tree.bst.core.INode r @(.right node)]
     (cmp/with-compare comp res item val
       (cond
        (= res  1) (if r
@@ -406,5 +406,5 @@
 
 ;;-- Printable Tree
 (extend-protocol PrintableTree
-  TransientNode (print-tree [x] (prtree "TransNode" (:value x) @(:left x) @(:right x)))
+  TransientNode (print-tree [x] (prtree "TransNode" (.value x) @(.left x) @(.right x)))
   TransientBinarySearchTree (print-tree [x] (prtree "TransBST :" (count x) @(.tree x))))
