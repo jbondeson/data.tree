@@ -315,7 +315,7 @@
 ;;  reference each other, short of throwing everything in one file,
 ;;  this is the only way to resolve that
 (def ^:private make-bst
-  (ns-resolve 'data.tree.bst 'make-bst))
+  (delay (ns-resolve 'data.tree.bst 'make-bst)))
 
 (deftype TransientBinarySearchTree [^IPersistentMap mdata
                                     ^Comparator comparator
@@ -326,11 +326,11 @@
   Counted
   (count [this] cnt)
   ITransientCollection
-  (persistent [_] 
+  (persistent [_]
     (.set edit nil)
     (if tree
-      (make-bst mdata comparator tree cnt)
-      (make-bst mdata comparator)))
+      ((force make-bst) mdata comparator tree cnt)
+      ((force make-bst) mdata comparator)))
   (conj [this item]
     (ensure-editable this edit)
     (try+
@@ -362,7 +362,6 @@
       (when (not (identical? owner (Thread/currentThread)))
         (throw (IllegalAccessError. "Transient used by non-owner thread")))
       this)))
-
 
 (defn transient-bst
   [^IPersistentMap mdata ^Comparator comparator ^data.tree.bst.core.INode tree count]
