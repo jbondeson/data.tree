@@ -4,6 +4,7 @@
   (:refer-clojure :exclude [comparator comp])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [data.compare :as cmp])
+  (:use [data.ifn])
   (:use [data.tree.bst.core])
   (:use [data.tree.bst.seq :only [make-seq]])
   (:use [data.tree.bst.transient :only [transient-bst]])
@@ -11,7 +12,7 @@
   (:import (clojure.lang Seqable Sequential ISeq IPersistentSet
                          IPersistentCollection Counted Sorted
                          Reversible IEditableCollection
-                         IPersistentMap)
+                         IPersistentMap IFn IObj)
            (java.util Comparator)
            (data.tree.bst.core LeafNode)
            (data.tree.bst.seq Seq)))
@@ -22,8 +23,10 @@
 
 (declare make-bst)
 
-(deftype EmptyBinarySearchTree [^IPersistentMap mdata
-                                ^Comparator comparator]
+(deftype&ifn EmptyBinarySearchTree [^IPersistentMap mdata
+                                    ^Comparator comparator]
+  ;; IFn definitions
+  {:1 (invoke [_ __] nil)}
   Object
   (equals [_ x]
     (if (isa? (type x) EmptyBinarySearchTree)
@@ -31,7 +34,7 @@
         (= comparator (.comparator x)))
       false))
   (hashCode [this] (hash (map identity this)))
-  clojure.lang.IObj
+  IObj
   (meta [_] mdata)
   (withMeta [_ mdata] (EmptyBinarySearchTree. mdata comparator))
   Sequential
@@ -55,10 +58,12 @@
   IEditableCollection
   (asTransient [this] (transient-bst mdata comparator nil 0)))
 
-(deftype BinarySearchTree [^IPersistentMap mdata
-                           ^Comparator comparator
-                           ^data.tree.bst.core.INode tree
-                           count]
+(deftype&ifn BinarySearchTree [^IPersistentMap mdata
+                               ^Comparator comparator
+                               ^data.tree.bst.core.INode tree
+                               count]
+  ;; IFn definitions
+  {:1 (invoke [this item] (.get this item))}
   Object
   (equals [_ x]
     (if (isa? (type x) BinarySearchTree)
@@ -68,7 +73,7 @@
          (= tree (.tree x))))
       false))
   (hashCode [this] (hash (map identity this)))
-  clojure.lang.IObj
+  IObj
   (meta [_] mdata)
   (withMeta [_ mdata] (BinarySearchTree. mdata comparator tree count))
   Sequential
