@@ -37,10 +37,8 @@
     (let [[x & xs] coll
           tree (conj!
                 (transient (EmptyBinarySearchTree. nil cmp/default))
-                x)
-          ins (fn [[t cnt] v]
-                [(conj! t v) (inc cnt)])]
-      (reduce ins [tree 1] xs))))
+                x)]
+      (reduce conj! tree xs))))
 
 (def test-trees
   {:leaf        '(50)
@@ -70,7 +68,7 @@
 
 (defn make-transient-trees
   []
-  (mmap (fn [v] (first (apply build-trans-tree-def v))) test-trees))
+  (mmap (fn [v] (apply build-trans-tree-def v)) test-trees))
 
 (def transients
   (make-transients))
@@ -219,7 +217,7 @@
     (cond
      (isa? type EmptyBinarySearchTree)     nil
      (isa? type BinarySearchTree)          (.tree tree)
-     (isa? type TransientBinarySearchTree) @(.tree tree)
+     (isa? type TransientBinarySearchTree) (get-head (persistent! tree))
      :else                                 tree)))
 
 ;; Alias node functions to take the default comparator

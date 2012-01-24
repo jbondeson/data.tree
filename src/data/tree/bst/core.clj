@@ -1,4 +1,4 @@
-(ns ^{:doc " Binary Search Tree Core"
+(ns ^{:doc "Binary Search Tree Core"
       :author "Jeremy Bondeson"}
   data.tree.bst.core
   (:refer-clojure :exclude [comparator comp])
