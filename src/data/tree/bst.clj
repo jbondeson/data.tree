@@ -4,7 +4,6 @@
   (:refer-clojure :exclude [comparator comp])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [data.compare :as cmp])
-  (:require [data.util.tref :as tref])
   (:use [data.tree.bst.core])
   (:use [data.tree.bst.seq :only [make-seq]])
   (:use [data.tree.bst.transient :only [transient-bst]])
@@ -14,7 +13,6 @@
                          Reversible IEditableCollection
                          IPersistentMap)
            (java.util Comparator)
-           (data.util EditContext)
            (data.tree.bst.core LeafNode)
            (data.tree.bst.seq Seq)))
 

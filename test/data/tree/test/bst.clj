@@ -1,10 +1,10 @@
 (ns data.tree.test.bst
   (:use [data.tree.bst])
+  (:use [data.transient])
   (:use [clojure.test])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [clojurecheck.core :as cc])
   (:require [data.compare :as cmp])
-  (:require [data.util.tref :as tref])
   (:use [data.tree.bst.transient])
   (:use data.tree.bst.core)
   (:import (data.tree.bst EmptyBinarySearchTree BinarySearchTree)
@@ -25,7 +25,7 @@
   [& args]
   (when-let [coll (seq args)]
     (let [[x & xs] coll
-          edit (tref/edit-context)
+          edit (edit-context)
           root (make-trans-node edit x nil nil)
           ins (fn [[^data.tree.bst.core.INode t cnt] v]
                 [(insert! t edit v cmp/default) (inc cnt)])]
@@ -235,12 +235,12 @@
   (retrieve tree item cmp/default))
 (defn ins!-def [^data.tree.bst.core.INode tree item]
   (try+
-   (insert! tree (tref/edit-context) item cmp/default)
+   (insert! tree (edit-context) item cmp/default)
    (catch :duplicate-key? _
      tree)))
 (defn del!-def [^data.tree.bst.core.INode tree item]
   (try+
-   (delete! tree (tref/edit-context) item cmp/default)
+   (delete! tree (edit-context) item cmp/default)
    (catch :not-found? _
      tree)))
 
