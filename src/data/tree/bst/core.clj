@@ -144,8 +144,8 @@
    :delete righty-delete
    :retrieve righty-retrieve
    :left const-nil
-   :right (fn [x] (.right x))
-   :value (fn [x] (.value x))})
+   :right (fn [^RightyNode x] (.right x))
+   :value (fn [^RightyNode x] (.value x))})
 
 ;;-- Full Node Implementation
 
@@ -207,7 +207,7 @@
    :right (fn [^FullNode x] (.right x))
    :value (fn [^FullNode x] (.value x))})
 
-;;-- Creation Tests
+;;-- Creation
 
 (defn- ^:static build-tree
   "Returns a vector consisting of the tree and count of items"
