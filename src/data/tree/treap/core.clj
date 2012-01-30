@@ -1,7 +1,7 @@
 (ns ^{:doc "Persistent Treap"
       :author "Jeremy Bondeson"}
   data.tree.treap.core
-  (:refer-clojure :exclude [comparator comp])
+  (:refer-clojure :exclude [comparator comp merge])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:use [data.tree.printable])
   (:require [data.compare :as cmp])
@@ -17,7 +17,7 @@
   (^data.tree.treap.core.INode
     rotate-left [this])
   (^data.tree.treap.core.INode
-    rotate-right [this])  
+    rotate-right [this])
   (retrieve [this item ^Comparator comp])
   (^data.tree.treap.core.INode
     left [node])
@@ -40,6 +40,31 @@
      ^data.tree.treap.core.INode right])
 
 (defn- ^:static const-nil [_] nil)
+
+(defmacro ^:private
+  make-node
+  [value priority left right]
+  (cond
+   (and ~left ~right) (FullNode. ~value ~priority ~left ~right)
+   ~left              (LeftyNode. ~value ~priority ~left)
+   ~right             (RightyNode. ~value ~priority ~right)
+   :else              (LeafNode. ~value ~priority)))
+
+#_(defn- ^INode
+  merge
+  [fst snd]
+  (let [fv (value fst)
+        sv (value snd)
+        fst-pri (< (priority fst) (priority snd))])
+  (cmp/with-compare comp res fv sv
+    (cond
+     (and (= res  1) fst-pri) (make-node fv )
+     (= res 1)
+     (and (= res -1) fst-pri) 
+     (= res -1)               (make-node )
+     :else                    (throw+ {:duplicate-key? true})))
+  
+  )
 
 ;;-- Leaf Node INode Implementation
 (defn- ^INode
