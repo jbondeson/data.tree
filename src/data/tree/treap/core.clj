@@ -44,27 +44,32 @@
 (defmacro ^:private
   make-node
   [value priority left right]
-  (cond
-   (and ~left ~right) (FullNode. ~value ~priority ~left ~right)
-   ~left              (LeftyNode. ~value ~priority ~left)
-   ~right             (RightyNode. ~value ~priority ~right)
-   :else              (LeafNode. ~value ~priority)))
+  `(let [l# ~left
+         r# ~right]
+     (cond
+      (and l# r#) (FullNode. ~value ~priority l# r#)
+      l#          (LeftyNode. ~value ~priority l#)
+      r#          (RightyNode. ~value ~priority r#)
+      :else       (LeafNode. ~value ~priority))))
 
-#_(defn- ^INode
+(defn 
   merge
-  [fst snd]
-  (let [fv (value fst)
-        sv (value snd)
-        fst-pri (< (priority fst) (priority snd))])
-  (cmp/with-compare comp res fv sv
-    (cond
-     (and (= res  1) fst-pri) (make-node fv )
-     (= res 1)
-     (and (= res -1) fst-pri) 
-     (= res -1)               (make-node )
-     :else                    (throw+ {:duplicate-key? true})))
-  
-  )
+  [^data.tree.treap.core.INode fst
+   ^data.tree.treap.core.INode snd
+   ^Comparator comp]
+  (if (and fst snd)
+    (let [[^data.tree.treap.core.INode l
+           ^data.tree.treap.core.INode r]
+          (cmp/case comp (value fst) (value snd)
+                    :< [fst snd]
+                    :> [snd fst]
+                    := (throw+ {:duplicate-key? true}))
+          lp (priority l)
+          rp (priority r)]
+      (if (< lp rp)
+        (make-node (value l) lp (left l) (merge (right l) r comp))
+        (make-node (value r) rp (merge (left r) l comp) (right r))))
+    (or fst snd)))
 
 ;;-- Leaf Node INode Implementation
 (defn- ^INode
@@ -72,30 +77,28 @@
   [^LeafNode node item priority ^Comparator comp]
   (let [val (.value node)
         pri (.priority node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (if (< priority pri)
+    
+    (cmp/case comp item val
+              := (throw+ {:duplicate-key? true})
+              :> (if (< priority pri)
                    (LeftyNode. item priority node)
                    (RightyNode. val pri (LeafNode. item priority)))
-       :else     (if (< priority pri)
+              :< (if (< priority pri)
                    (RightyNode. item priority node)
-                   (LeftyNode. val pri (LeafNode. item priority)))))))
+                   (LeftyNode. val pri (LeafNode. item priority))))))
 
 (defn- ^INode
   leaf-delete
   [^LeafNode node item ^Comparator comp]
-  (cmp/with-compare comp res item (.value node)
-    (when (not (= res 0))
-      (throw+ {:not-found? true}))))
+  (cmp/if-not= comp item (.value node)
+               (throw+ {:not-found? true})))
 
 (defn- 
   leaf-retrieve
   [^LeafNode node item ^Comparator comp]
   (let [val (.value node)]
-    (cmp/with-compare comp res item val
-      (when  (= res 0) val))))
-
+    (cmp/if= comp item val
+             val)))
 
 (extend LeafNode
   INode
@@ -117,18 +120,27 @@
   (let [val (.value node)
         pri (.priority node)
         l   (.left node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0)  (throw+ {:duplicate-key? true})
-       (= res -1) (let [n (LeftyNode. val pri (insert l item priority comp))]
-                    (if (< priority pri)
-                      (rotate-right n)
-                      n))
-       :else      (if (< priority pri)
-                    (LeftyNode. item priority node)
-                    (FullNode. val pri l (LeafNode. item priority)))))))
+    (cmp/case comp item val
+              := (throw+ {:duplicate-key? true})
+              :< (let [n (LeftyNode. val pri (insert l item priority comp))]
+                   (if (< priority pri)
+                     (rotate-right n)
+                     n))
+              :> (if (< priority pri)
+                   (LeftyNode. item priority node)
+                   (FullNode. val pri l (LeafNode. item priority))))))
 
-;;-- DELETE OP
+(defn- ^INode
+  lefty-delete
+  [^LeftyNode node item ^Comparator comp]
+  (let [val (.value node)]
+    (cmp/case comp item val
+              := (.left node)
+              :< (let [nnode (delete (.left node) item comp)]
+                   (if nnode
+                     (LeftyNode. val (.priority node) nnode)
+                     (LeafNode. val (.priority node))))
+              :> (throw+ {:not-found? true}))))
 
 (defn- ^INode
   lefty-rotate-right
@@ -150,15 +162,14 @@
   lefty-retrieve
   [^LeftyNode node item ^Comparator comp]
   (let [val (.value node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0)  val
-       (= res -1) (retrieve (.left node) item comp)))))
+    (cmp/case comp item val
+              := val
+              :< (retrieve (.left node) item comp))))
 
 (extend LeftyNode
   INode
   {:insert lefty-insert
-   :delete nil
+   :delete lefty-delete
    :rotate-left identity
    :rotate-right lefty-rotate-right
    :retrieve lefty-retrieve
@@ -174,18 +185,27 @@
   (let [val (.value node)
         pri (.priority node)
         r   (.right node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (let [n (RightyNode. val pri (insert r item priority comp))]
+    (cmp/case comp item val
+              := (throw+ {:duplicate-key? true})
+              :> (let [n (RightyNode. val pri (insert r item priority comp))]
                    (if (< priority pri)
                      (rotate-left n)
                      n))
-       :else     (if (< priority pri)
+              :< (if (< priority pri)
                    (RightyNode. item priority node)
-                   (FullNode. val pri (LeafNode. item priority) r))))))
+                   (FullNode. val pri (LeafNode. item priority) r)))))
 
-;;-- DELETE OP
+(defn- ^INode
+  righty-delete
+  [^RightyNode node item ^Comparator comp]
+  (let [val (.value node)]
+    (cmp/case comp item val
+              := (.right node)
+              :> (let [nnode (delete (.right node) item comp)]
+                   (if nnode
+                     (RightyNode. val (.priority node) nnode)
+                     (LeafNode. val (.priority node))))
+              :< (throw+ {:not-found? true}))))
 
 (defn- ^INode
   righty-rotate-left
@@ -207,15 +227,14 @@
   righty-retrieve
   [^RightyNode node item ^Comparator comp]
   (let [val (.value node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0)  val
-       (= res 1) (retrieve (.right node) item comp)))))
+    (cmp/case comp item val
+              :=  val
+              :> (retrieve (.right node) item comp))))
 
 (extend RightyNode
   INode
   {:insert righty-insert
-   :delete nil
+   :delete righty-delete
    :rotate-left righty-rotate-left
    :rotate-right identity
    :retrieve righty-retrieve
@@ -233,19 +252,33 @@
         pri (.priority node)
         l   (.left node)
         r   (.right node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0) (throw+ {:duplicate-key? true})
-       (= res 1) (let [n (FullNode. val pri l (insert r item priority comp))]
+    (cmp/case comp item val
+              := (throw+ {:duplicate-key? true})
+              :> (let [n (FullNode. val pri l (insert r item priority comp))]
                    (if (< priority pri)
                      (rotate-left n)
                      n))
-       :else     (let [n (FullNode. val pri (insert l item priority comp) r)]
+              :< (let [n (FullNode. val pri (insert l item priority comp) r)]
                    (if (< priority pri)
                      (rotate-right n)
-                     n))))))
+                     n)))))
 
-;;-- DELETE OP
+(defn- ^INode
+  full-delete
+  [^FullNode node item ^Comparator comp]
+  (let [val (.value node)
+        l   (.left node)
+        r   (.right node)]
+    (cmp/case comp item val
+              := (merge l r)
+              :> (let [rnode (delete r item comp)]
+                    (if rnode
+                      (FullNode. val (.priority node) l rnode)
+                      (LeftyNode. val (.priority node) l)))
+              :< (let [lnode (delete l item comp)]
+                    (if lnode
+                      (FullNode. val (.priority node) lnode r)
+                      (RightyNode. val (.priority node) r))))))
 
 (defn- ^INode
   full-rotate-left
@@ -285,16 +318,15 @@
   full-retrieve
   [^FullNode node item ^Comparator comp]
   (let [val (.value node)]
-    (cmp/with-compare comp res item val
-      (cond
-       (= res 0)  val
-       (= res 1) (retrieve (.right node) item comp)
-       :else     (retrieve (.left node) item comp)))))
+    (cmp/case comp item val
+              :=  val
+              :> (retrieve (.right node) item comp)
+              :< (retrieve (.left node) item comp))))
 
 (extend FullNode
   INode
   {:insert full-insert
-   :delete nil
+   :delete full-delete
    :rotate-left full-rotate-left
    :rotate-right full-rotate-right
    :retrieve full-retrieve
@@ -315,8 +347,7 @@
                 (try+
                  [(insert t v (rand) comparator) (inc c)]
                  (catch :duplicate-key? _
-                   whole)))
-          ]
+                   whole)))]
       (reduce ins [root 1] xs))))
 
 ;;-- Pretty Printing
@@ -329,5 +360,4 @@
   RightyNode
   (print-tree [x] (prtree (str "RightyNode p" (.priority x)) (.value x) (.right x)))
   FullNode
-  (print-tree [x] (prtree (str "FullNode p" (.priority x)) (.value x) (.left x) (.right x)))
-  )
+  (print-tree [x] (prtree (str "FullNode p" (.priority x)) (.value x) (.left x) (.right x))))
