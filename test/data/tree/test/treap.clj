@@ -1,6 +1,7 @@
 (ns ^{:doc "Tests for the treap data structure"
       :author "Jeremy Bondeson"}
   data.tree.test.treap
+  (:refer-clojure :exclude [merge])
   (:use [data.tree.treap])
   (:use [data.tree.treap.core])
   (:use [clojure.test])
