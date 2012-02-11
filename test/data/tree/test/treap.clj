@@ -4,21 +4,14 @@
   (:refer-clojure :exclude [merge])
   (:use [data.tree.treap])
   (:use [data.tree.treap.core])
+  (:use [data.tree.treap.polymorphic])
   (:use [clojure.test])
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:require [clojurecheck.core :as cc])
   (:require [data.compare :as cmp])
-  (:import (data.tree.treap.core LeafNode LeftyNode RightyNode FullNode))
-  )
+  (:import (data.tree.treap.polymorphic LeafNode LeftyNode RightyNode FullNode)))
 
-(def ^:private build-node-tree
-  (ns-resolve 'data.tree.treap.core 'build-tree))
-
-(defn build-node-tree-def
-  [vals]
-  (first (build-node-tree cmp/default vals)))
-
-(defmacro ^:private tree-test
+(defmacro tree-test
   [tree test-fn]
   `(when ~tree
      (loop [q# (conj (clojure.lang.PersistentQueue/EMPTY) ~tree)]
@@ -32,22 +25,21 @@
             (and l# r#) (recur (conj next# l# r#))
             l#          (recur (conj next# l#))
             r#          (recur (conj next# r#))
-            :else       (recur next#))))))
-  )
+            :else       (recur next#)))))))
 
-(defmacro ^:private left<?
+(defmacro left<?
   [node]
   `(if-let [l# (left ~node)]
      (= -1 (.compare cmp/default (value l#) (value ~node)))
      true))
 
-(defmacro ^:private right>?
+(defmacro right>?
   [node]
   `(if-let [r# (right ~node)]
      (= 1 (.compare cmp/default (value r#) (value ~node)))
      true))
 
-(defmacro ^:private priority<?
+(defmacro priority<?
   [node]
   `(let [r# (right ~node)
          l# (left ~node)
@@ -56,32 +48,33 @@
          p#   (priority ~node)]
      (and (<= p# rp#) (<= p# lp#))))
 
-(defmacro ^:private node-contains?
+(defmacro node-contains?
   [node item]
   `(when (retrieve ~node ~item cmp/default) true))
 
-(defmacro ^:private node-tree-prop
-  [msg tree set items & body]
+(defmacro node-tree-prop
+  [fn-build msg tree set items & body]
   `(cc/property
     ~msg
     [~items (cc/list (cc/int :lower 0 :upper 32767))]
-    (let [~tree (build-node-tree-def ~items)
+    (let [~tree (~fn-build ~items)
           ~set (apply sorted-set ~items)]
       ~@body)))
 
-(deftest node-tree-properties
-  (node-tree-prop
-   "search tree structure"
-   tree set list
-   (tree-test tree #(is (and (left<? %) (right>? %)))))
-  
-  (node-tree-prop
-     "priority min-heap"
-     tree set list
-     (tree-test tree #(is (priority<? %))))
-  
-  (node-tree-prop
-   "membership tests"
-   tree set list
-   (is (every? #(= (contains? set %) (node-contains? tree %)) list)))
-  )
+(defmacro node-tree-prop-tests
+  [name fn-build]
+  `(deftest ~name ;;node-tree-properties
+     (node-tree-prop ~fn-build
+      "search tree structure"
+      tree# set# list#
+      (tree-test tree# #(is (and (left<? %) (right>? %)))))
+     
+     (node-tree-prop ~fn-build
+      "priority min-heap"
+      tree# set# list#
+      (tree-test tree# #(is (priority<? %))))
+     
+     (node-tree-prop ~fn-build
+      "membership tests"
+      tree# set# list#
+      (is (every? #(= (contains? set# %) (node-contains? tree# %)) list#)))))
