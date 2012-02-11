@@ -1,7 +1,10 @@
 (ns data.tree.test.perf
+  (:require [data.compare :as cmp])
   (:require [data.tree.bst :as bst])
   (:require [data.tree.bst.core :as bstcore])
-  (:require [data.tree.treap.core :as treapcore])
+  (:use [data.tree.treap.core])
+  (:use [data.tree.treap.polymorphic])
+  (:use [data.tree.treap.simple])
   (:use [data.tree.test.bst])
   (:use [data.tree.test.treap])
   (:use [clojure.test])
@@ -21,9 +24,14 @@
     (time (do (doall (apply build-def coll)) nil))))
 
 
-(defn treap-time []
+(defn treap-time-poly []
   (let [coll (balanced-seq 10000)] 
-    (time (do (build-node-tree-def coll) nil))))
+    (time (do (build-tree :polymorphic coll cmp/default) nil))))
+
+
+(defn treap-time-simple []
+  (let [coll (balanced-seq 10000)] 
+    (time (do (build-tree :simple coll cmp/default) nil))))
 
 
 (defn tree-baseline []
